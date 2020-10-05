@@ -10,7 +10,7 @@ use ::lasso::{Rodeo, Spur};
 #[derive(StructOpt, Debug)]
 enum Opt {
     /// Start a REPL.
-    Run {
+    Mount {
         /// Path to image for REPL.
         image: Option<PathBuf>,
     },
@@ -19,6 +19,14 @@ enum Opt {
         /// Path to image.
         image: PathBuf,
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+enum Type {
+    Integer,
+    Float,
+    Boolean,
+    String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -32,6 +40,7 @@ enum Value {
     // This all is just a sketch at the moment.
     // Essentially, the only string type we have at the moment is &'static str.
     String(Spur),
+    Type(Type),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -289,7 +298,7 @@ mod parse {
 fn main() -> Result<()> {
     let opt = Opt::from_args();
     match opt {
-        Opt::Run { image: image_path } => {
+        Opt::Mount { image: image_path } => {
             let mut image = if let Some(ref image) = image_path {
                 load_image(&image)?
             } else {
@@ -325,6 +334,7 @@ fn main() -> Result<()> {
                                     Value::Float(float) => println!("{}", float),
                                     Value::Boolean(boolean) => println!("{}", boolean),
                                     Value::String(key) => println!("{}", image.strings.resolve(&key)),
+                                    Value::Type(ty) => println!("{:?}", ty),
                                 }
                             } else {
                                 eprintln!("binding {} does not exist", ident.name);
