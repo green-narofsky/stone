@@ -1,10 +1,11 @@
 [package]
 name = "stone"
-version = "0.0.0"
+version = "0.0.1"
 authors = ["John Matthew Narofsky <7ytd765789@gmail.com>"]
 edition = "2018"
 description = "Something of a toy language, for now."
 license = "AGPL-3.0-or-later"
+repository = "https://github.com/green-narofsky/stone"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
