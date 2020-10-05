@@ -1,14 +1,14 @@
 # Stone Language
 ----------------
-Currently a stub. Don't get your hopes up.
+Currently not much more than a stub. Don't get your hopes up.
 
 
-Ratcheting up the abstraction of Lisp ten billion times.
+<!-- Ratcheting up the abstraction of Lisp ten billion times. -->
 
-With a type system ten billion times stronger than Rust's.
+<!-- With a type system ten billion times stronger than Rust's. -->
 
-Ten billion, Senku's favorite number.
-*Oh yes.*
+<!-- Ten billion, Senku's favorite number. -->
+<!-- *Oh yes.* -->
 
 <!-- ## The REPL -->
 <!-- To ease getting into this, `cargo run` builds and starts up the main driver binary. -->
