@@ -1,5 +1,7 @@
 # Stone Language
 ----------------
+Currently a stub. Don't get your hopes up.
+
 
 Ratcheting up the abstraction of Lisp ten billion times.
 
