@@ -24,10 +24,13 @@ enum Opt {
 #[derive(Serialize, Deserialize, Debug)]
 enum Value {
     Integer(i64),
+    Float(f64),
+    Boolean(bool),
     // Probably not going to stick with interning all strings,
     // because it'd make mutation quite expensive: clone for every change.
     // I will, however, have a reference type.
     // This all is just a sketch at the moment.
+    // Essentially, the only string type we have at the moment is &'static str.
     String(Spur),
 }
 
@@ -319,6 +322,8 @@ fn main() -> Result<()> {
                             if let Some(binding) = image.find_binding(key) {
                                 match binding.value {
                                     Value::Integer(int) => println!("{}", int),
+                                    Value::Float(float) => println!("{}", float),
+                                    Value::Boolean(boolean) => println!("{}", boolean),
                                     Value::String(key) => println!("{}", image.strings.resolve(&key)),
                                 }
                             } else {
