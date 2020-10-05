@@ -199,15 +199,25 @@ mod parse {
     }
 
     #[derive(Debug)]
+    pub(crate) enum Expression<'a> {
+        Lit(Literal<'a>),
+    }
+    fn expression(input: &str) -> ::nom::IResult<&str, Expression> {
+        // TODO: support more complex expressions
+        let (input, lit) = literal(input)?;
+        Ok((input, Expression::Lit(lit)))
+    }
+
+    #[derive(Debug)]
     pub(crate) enum Command<'a> {
         Print(PrintArg<'a>),
-        Bind(&'a str, &'a str),
+        Bind(Identifier<'a>, Expression<'a>),
     }
     impl Command<'_> {
         pub(crate) fn parse<'a>(input: &'a str) -> Result<Command<'a>> {
             use ::nom::sequence::tuple;
             use ::nom::bytes::complete::tag;
-            use ::nom::multi::many1;
+            use ::nom::multi::{many1, many0};
             use ::nom::branch::alt;
             match keyword(input) {
                 Ok((input, Keyword::Print)) => {
@@ -228,7 +238,13 @@ mod parse {
                         Ok(Command::Print(arg))
                     }
                 },
-                Ok((input, Keyword::Let)) => todo!("let bindings"),
+                Ok((input, Keyword::Let)) => {
+                    let (input, (_, ident, _, _, _, exp)) =
+                        tuple((many1(whitespace), identifier, many0(whitespace),
+                               tag("="), many0(whitespace), expression))(input)
+                        .map_err(|e| ::anyhow::anyhow!("{}", e))?;
+                    Ok(Command::Bind(ident, exp))
+                },
                 Err(e) => Err(::anyhow::anyhow!("{}", e)),
             }
         }
