@@ -21,9 +21,13 @@ enum Opt {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 enum Value {
     Integer(i64),
+    // Probably not going to stick with interning all strings,
+    // because it'd make mutation quite expensive: clone for every change.
+    // I will, however, have a reference type.
+    // This all is just a sketch at the moment.
     String(Spur),
 }
 
@@ -86,9 +90,32 @@ impl Image {
         self.bindings.push(Binding { name, value })
     }
     /// Get the key for a string, interning it if it does not yet exist.
-    fn get_or_intern_string(&mut self, val: String) -> Spur {
+    fn get_or_intern_string(&mut self, val: &str) -> Spur {
         self.strings.get_or_intern(val)
     }
+    /// Reify a parsed expression against this image.
+    /// Note that this does not perform evaluation.
+    fn reify_parsed_expression(&mut self, exp: parse::Expression) -> Expression {
+        match exp {
+            parse::Expression::Lit(lit) => match lit {
+                parse::Literal::Integer(int) => Expression::Literal(Value::Integer(int)),
+                parse::Literal::String(string) => {
+                    Expression::Literal(Value::String(self.get_or_intern_string(string)))
+                },
+            },
+        }
+    }
+    /// Perform evaluation of expression.
+    fn eval_expression(&mut self, exp: Expression) -> Value {
+        match exp {
+            Expression::Literal(val) => val,
+        }
+    }
+}
+
+#[derive(Debug)]
+enum Expression {
+    Literal(Value),
 }
 
 /// Load an image from a path.
@@ -157,7 +184,7 @@ mod parse {
 
     #[derive(Debug)]
     pub(crate) struct Identifier<'a> {
-        name: &'a str,
+        pub(crate) name: &'a str,
     }
     fn identifier(input: &str) -> nom::IResult<&str, Identifier> {
         use ::nom::bytes::complete::take_while1;
@@ -243,7 +270,12 @@ mod parse {
                         tuple((many1(whitespace), identifier, many0(whitespace),
                                tag("="), many0(whitespace), expression))(input)
                         .map_err(|e| ::anyhow::anyhow!("{}", e))?;
-                    Ok(Command::Bind(ident, exp))
+                    let remaining_input = input.trim();
+                    if remaining_input.len() > 0 {
+                        ::anyhow::bail!("unexpected trailing input: {}", remaining_input)
+                    } else {
+                        Ok(Command::Bind(ident, exp))
+                    }
                 },
                 Err(e) => Err(::anyhow::anyhow!("{}", e)),
             }
@@ -255,7 +287,7 @@ fn main() -> Result<()> {
     let opt = Opt::from_args();
     match opt {
         Opt::Run { image: image_path } => {
-            let image = if let Some(ref image) = image_path {
+            let mut image = if let Some(ref image) = image_path {
                 load_image(&image)?
             } else {
                 Image::new()
@@ -271,6 +303,31 @@ fn main() -> Result<()> {
                 }
 
                 println!("command: {:?}", parse::Command::parse(&input));
+                match parse::Command::parse(&input) {
+                    Ok(parse::Command::Bind(ident, exp)) => {
+                        let exp = image.reify_parsed_expression(exp);
+                        println!("exp: {:?}", exp);
+                        let val = image.eval_expression(exp);
+                        let key = image.get_or_intern_string(ident.name);
+                        image.push_binding(key, val);
+                    },
+                    Ok(parse::Command::Print(arg)) => match arg {
+                        parse::PrintArg::Lit(parse::Literal::Integer(int)) => println!("{}", int),
+                        parse::PrintArg::Lit(parse::Literal::String(string)) => println!("{}", string),
+                        parse::PrintArg::Ident(ident) => {
+                            let key = image.get_or_intern_string(ident.name);
+                            if let Some(binding) = image.find_binding(key) {
+                                match binding.value {
+                                    Value::Integer(int) => println!("{}", int),
+                                    Value::String(key) => println!("{}", image.strings.resolve(&key)),
+                                }
+                            } else {
+                                eprintln!("binding {} does not exist", ident.name);
+                            }
+                        }
+                    },
+                    Err(e) => eprintln!("parse error: {}", e),
+                }
 
                 input.clear();
             }
