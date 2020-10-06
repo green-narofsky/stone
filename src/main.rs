@@ -1,10 +1,10 @@
 // TODO: A basic REPL.
-use ::std::path::{PathBuf, Path};
-use ::std::fs::File;
-use ::structopt::StructOpt;
-use ::serde::{Serialize, Deserialize};
 use ::anyhow::Result;
 use ::lasso::{Rodeo, Spur};
+use ::serde::{Deserialize, Serialize};
+use ::std::fs::File;
+use ::std::path::{Path, PathBuf};
+use ::structopt::StructOpt;
 
 /// Driver binary for Stone
 #[derive(StructOpt, Debug)]
@@ -18,7 +18,7 @@ enum Opt {
     View {
         /// Path to image.
         image: PathBuf,
-    }
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -27,8 +27,111 @@ enum Type {
     Float,
     Boolean,
     String,
+    Type,
 }
 
+struct Signature {
+    params: Vec<Type>,
+    ret: Type,
+}
+
+
+macro_rules! perhaps_new {
+    ($a:tt) => { $a };
+    ($a:ty => $con:expr) => { $con }
+}
+
+macro_rules! prim_funcs {
+    ($(#[$attr:meta])* $vis:vis $group:ident (? $parse_err:tt $(=> $parse_err_new:expr)?) {
+        $($name:ident : $vari:ident ($($par_ty:ident),*) -> $ret_ty:ident = ($($par_name:ident),*) => $exp:expr),*
+    $(,)?}) => {
+        $(#[$attr])*
+        $vis enum $group {
+            $($vari),*
+        }
+        impl $group {
+            $vis fn sig(&self) -> Signature {
+                match self {
+                    $(Self::$vari => Signature {
+                        params: ::std::vec![$(Type::$par_ty),*],
+                        ret: Type::$ret_ty,
+                    }),*
+                }
+            }
+            $vis fn eval(&self, args: Vec<Value>) -> Value {
+                match self {
+                    $(Self::$vari => {
+                        let mut it = args.into_iter();
+                        let exp = |$($par_name),*| {
+                            $exp
+                        };
+                        Value::$ret_ty(exp(
+                            $(
+                                match it.next().unwrap() {
+                                    Value::$par_ty(x) => x,
+                                    x => panic!(
+                                        "type mismatch on primitive function {}: expected {:?}, got {:?}",
+                                        stringify!($name), Type::$par_ty, x.type_of()
+                                    ),
+                                }
+                            ),*
+                        ))
+                    }),*
+                }
+            }
+            $vis fn name(&self) -> &'static str {
+                match self {
+                    $(Self::$vari => stringify!($name)),*
+                }
+            }
+        }
+        impl ::core::str::FromStr for $group {
+            type Err = $parse_err;
+            fn from_str(input: &str) -> Result<$group, Self::Err> {
+                match input {
+                    $(stringify!($name) => Ok($group::$vari)),*,
+                    _ => Err(perhaps_new!($parse_err $(=> $parse_err_new)?)),
+                }
+            }
+        }
+    }
+}
+
+/// Failure to parse a pure primitive function from a string.
+#[derive(Debug)]
+struct PrimParseError;
+
+prim_funcs! {
+    /// Primitive functions with no side effects.
+    #[derive(PartialEq, Eq, Debug)]
+    PrimitivePureFunction (?PrimParseError) {
+        sum  : Sum(Integer, Integer) -> Integer = (x, y) => x + y,
+        diff : Difference(Integer, Integer) -> Integer = (x, y) => x - y,
+        quot : Quotient(Integer, Integer) -> Integer = (x, y) => x / y,
+        prod : Product(Integer, Integer) -> Integer = (x, y) => x * y,
+    }
+}
+
+#[cfg(test)]
+mod prim_test {
+    use super::PrimitivePureFunction;
+    #[test]
+    fn parsing_primitives() {
+        assert_eq!("sum".parse::<PrimitivePureFunction>().unwrap(), PrimitivePureFunction::Sum);
+        assert_eq!("diff".parse::<PrimitivePureFunction>().unwrap(), PrimitivePureFunction::Difference);
+        assert_eq!("quot".parse::<PrimitivePureFunction>().unwrap(), PrimitivePureFunction::Quotient);
+        assert_eq!("prod".parse::<PrimitivePureFunction>().unwrap(), PrimitivePureFunction::Product);
+    }
+}
+
+struct PureFunction {
+    sig: Signature,
+    expression: (),
+}
+
+// Note that for the prim_funcs macro, we require
+// the Type enum and Value enum to have the same name
+// for every variant.
 #[derive(Serialize, Deserialize, Debug)]
 enum Value {
     Integer(i64),
@@ -41,6 +144,18 @@ enum Value {
     // Essentially, the only string type we have at the moment is &'static str.
     String(Spur),
     Type(Type),
+    // PureFunction(PureFunction),
+}
+impl Value {
+    fn type_of(&self) -> Type {
+        match self {
+            Value::Integer(_) => Type::Integer,
+            Value::Float(_) => Type::Float,
+            Value::Boolean(_) => Type::Boolean,
+            Value::String(_) => Type::String,
+            Value::Type(_) => Type::Type,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -54,7 +169,9 @@ struct Binding {
 }
 
 fn serialize_rodeo<S>(rodeo: &Rodeo, serializer: S) -> Result<S::Ok, S::Error>
-where S: ::serde::Serializer {
+where
+    S: ::serde::Serializer,
+{
     use ::serde::ser::SerializeSeq;
     let mut vec = serializer.serialize_seq(Some(rodeo.len()))?;
     for v in rodeo.strings() {
@@ -63,7 +180,9 @@ where S: ::serde::Serializer {
     vec.end()
 }
 fn deserialize_rodeo<'de, D>(deserializer: D) -> Result<Rodeo, D::Error>
-where D: ::serde::Deserializer<'de> {
+where
+    D: ::serde::Deserializer<'de>,
+{
     // There's probably a much better way to do this.
     let vec: Vec<String> = Deserialize::deserialize(deserializer)?;
     let mut rodeo = Rodeo::new();
@@ -77,7 +196,10 @@ where D: ::serde::Deserializer<'de> {
 #[derive(Serialize, Deserialize)]
 struct Image {
     /// String interner.
-    #[serde(serialize_with = "serialize_rodeo", deserialize_with = "deserialize_rodeo")]
+    #[serde(
+        serialize_with = "serialize_rodeo",
+        deserialize_with = "deserialize_rodeo"
+    )]
     strings: Rodeo,
     /// At least for now, we store bindings in order.
     bindings: Vec<Binding>,
@@ -113,7 +235,7 @@ impl Image {
                 parse::Literal::Integer(int) => Expression::Literal(Value::Integer(int)),
                 parse::Literal::String(string) => {
                     Expression::Literal(Value::String(self.get_or_intern_string(string)))
-                },
+                }
             },
         }
     }
@@ -211,8 +333,8 @@ mod parse {
     }
     fn literal(input: &str) -> ::nom::IResult<&str, Literal> {
         use ::nom::branch::alt;
-        use ::nom::bytes::complete::{take_until, take_while1};
         use ::nom::bytes::complete::tag;
+        use ::nom::bytes::complete::{take_until, take_while1};
         alt((
             |i| {
                 let (i, _) = tag("\"")(i)?;
@@ -223,7 +345,9 @@ mod parse {
             |i| {
                 let (i, int): (&str, &str) = take_while1(|c: char| c.is_digit(10))(i)?;
                 let int = match int.parse::<i64>() {
-                    Err(_) => return Err(::nom::Err::Failure((i, ::nom::error::ErrorKind::TooLarge))),
+                    Err(_) => {
+                        return Err(::nom::Err::Failure((i, ::nom::error::ErrorKind::TooLarge)))
+                    }
                     Ok(x) => x,
                 };
                 Ok((i, Literal::Integer(int)))
@@ -254,41 +378,50 @@ mod parse {
     }
     impl Command<'_> {
         pub(crate) fn parse<'a>(input: &'a str) -> Result<Command<'a>> {
-            use ::nom::sequence::tuple;
-            use ::nom::bytes::complete::tag;
-            use ::nom::multi::{many1, many0};
             use ::nom::branch::alt;
+            use ::nom::bytes::complete::tag;
+            use ::nom::multi::{many0, many1};
+            use ::nom::sequence::tuple;
             match keyword(input) {
                 Ok((input, Keyword::Print)) => {
-                    let (input, (_, arg)) = tuple((many1(whitespace), alt((
-                        |i| {
-                            let (i, ident) = identifier(i)?;
-                            Ok((i, PrintArg::Ident(ident)))
-                        },
-                        |i| {
-                            let (i, lit) = literal(i)?;
-                            Ok((i, PrintArg::Lit(lit)))
-                        }))
-                    ))(input).map_err(|e| ::anyhow::anyhow!("{}", e))?;
+                    let (input, (_, arg)) = tuple((
+                        many1(whitespace),
+                        alt((
+                            |i| {
+                                let (i, ident) = identifier(i)?;
+                                Ok((i, PrintArg::Ident(ident)))
+                            },
+                            |i| {
+                                let (i, lit) = literal(i)?;
+                                Ok((i, PrintArg::Lit(lit)))
+                            },
+                        )),
+                    ))(input)
+                    .map_err(|e| ::anyhow::anyhow!("{}", e))?;
                     let remaining_input = input.trim();
                     if remaining_input.len() > 0 {
                         ::anyhow::bail!("unexpected trailing input: {}", remaining_input)
                     } else {
                         Ok(Command::Print(arg))
                     }
-                },
+                }
                 Ok((input, Keyword::Let)) => {
-                    let (input, (_, ident, _, _, _, exp)) =
-                        tuple((many1(whitespace), identifier, many0(whitespace),
-                               tag("="), many0(whitespace), expression))(input)
-                        .map_err(|e| ::anyhow::anyhow!("{}", e))?;
+                    let (input, (_, ident, _, _, _, exp)) = tuple((
+                        many1(whitespace),
+                        identifier,
+                        many0(whitespace),
+                        tag("="),
+                        many0(whitespace),
+                        expression,
+                    ))(input)
+                    .map_err(|e| ::anyhow::anyhow!("{}", e))?;
                     let remaining_input = input.trim();
                     if remaining_input.len() > 0 {
                         ::anyhow::bail!("unexpected trailing input: {}", remaining_input)
                     } else {
                         Ok(Command::Bind(ident, exp))
                     }
-                },
+                }
                 Err(e) => Err(::anyhow::anyhow!("{}", e)),
             }
         }
@@ -322,10 +455,12 @@ fn main() -> Result<()> {
                         let val = image.eval_expression(exp);
                         let key = image.get_or_intern_string(ident.name);
                         image.push_binding(key, val);
-                    },
+                    }
                     Ok(parse::Command::Print(arg)) => match arg {
                         parse::PrintArg::Lit(parse::Literal::Integer(int)) => println!("{}", int),
-                        parse::PrintArg::Lit(parse::Literal::String(string)) => println!("{}", string),
+                        parse::PrintArg::Lit(parse::Literal::String(string)) => {
+                            println!("{}", string)
+                        }
                         parse::PrintArg::Ident(ident) => {
                             let key = image.get_or_intern_string(ident.name);
                             if let Some(binding) = image.find_binding(key) {
@@ -333,7 +468,9 @@ fn main() -> Result<()> {
                                     Value::Integer(int) => println!("{}", int),
                                     Value::Float(float) => println!("{}", float),
                                     Value::Boolean(boolean) => println!("{}", boolean),
-                                    Value::String(key) => println!("{}", image.strings.resolve(&key)),
+                                    Value::String(key) => {
+                                        println!("{}", image.strings.resolve(&key))
+                                    }
                                     Value::Type(ty) => println!("{:?}", ty),
                                 }
                             } else {
@@ -346,7 +483,7 @@ fn main() -> Result<()> {
 
                 input.clear();
             }
-        },
+        }
         Opt::View { image } => {
             println!("{}", serde_json::to_string(&load_image(&image)?)?);
         }
