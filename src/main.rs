@@ -2,9 +2,11 @@
 use ::anyhow::Result;
 use ::lasso::{Rodeo, Spur};
 use ::serde::{Deserialize, Serialize};
+use ::std::collections::HashMap;
 use ::std::fs::File;
 use ::std::path::{Path, PathBuf};
 use ::structopt::StructOpt;
+mod jit;
 
 /// Driver binary for Stone
 #[derive(StructOpt, Debug)]
@@ -26,6 +28,7 @@ enum Type {
     Integer,
     Float,
     Boolean,
+    Unit,
     String,
     Type,
 }
@@ -35,10 +38,13 @@ struct Signature {
     ret: Type,
 }
 
-
 macro_rules! perhaps_new {
-    ($a:tt) => { $a };
-    ($a:ty => $con:expr) => { $con }
+    ($a:tt) => {
+        $a
+    };
+    ($a:ty => $con:expr) => {
+        $con
+    };
 }
 
 macro_rules! prim_funcs {
@@ -117,16 +123,44 @@ mod prim_test {
     use super::PrimitivePureFunction;
     #[test]
     fn parsing_primitives() {
-        assert_eq!("sum".parse::<PrimitivePureFunction>().unwrap(), PrimitivePureFunction::Sum);
-        assert_eq!("diff".parse::<PrimitivePureFunction>().unwrap(), PrimitivePureFunction::Difference);
-        assert_eq!("quot".parse::<PrimitivePureFunction>().unwrap(), PrimitivePureFunction::Quotient);
-        assert_eq!("prod".parse::<PrimitivePureFunction>().unwrap(), PrimitivePureFunction::Product);
+        assert_eq!(
+            "sum".parse::<PrimitivePureFunction>().unwrap(),
+            PrimitivePureFunction::Sum
+        );
+        assert_eq!(
+            "diff".parse::<PrimitivePureFunction>().unwrap(),
+            PrimitivePureFunction::Difference
+        );
+        assert_eq!(
+            "quot".parse::<PrimitivePureFunction>().unwrap(),
+            PrimitivePureFunction::Quotient
+        );
+        assert_eq!(
+            "prod".parse::<PrimitivePureFunction>().unwrap(),
+            PrimitivePureFunction::Product
+        );
     }
 }
+
+struct CallTree {}
 
 struct PureFunction {
     sig: Signature,
     expression: (),
+}
+
+/// A sum type.
+struct SumType {
+    variants: Vec<Type>,
+}
+
+/// An instance of a sum type.
+struct SumValue {}
+
+/// A product type.
+struct ProductType {
+    name: String,
+    fields: Vec<Type>,
 }
 
 // Note that for the prim_funcs macro, we require
@@ -137,6 +171,7 @@ enum Value {
     Integer(i64),
     Float(f64),
     Boolean(bool),
+    Unit,
     // Probably not going to stick with interning all strings,
     // because it'd make mutation quite expensive: clone for every change.
     // I will, however, have a reference type.
@@ -154,6 +189,7 @@ impl Value {
             Value::Boolean(_) => Type::Boolean,
             Value::String(_) => Type::String,
             Value::Type(_) => Type::Type,
+            Value::Unit => Type::Unit,
         }
     }
 }
@@ -192,6 +228,38 @@ where
     Ok(rodeo)
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+struct BinaryKey {
+    val: u32,
+}
+/// A thing for us to store machine code in.
+/// Actual Stone code should not have direct access to this.
+/// The REPL, however, should provide control of this binary cache.
+/// I haven't sorted out the exact caching model,
+/// but surely there are gains to be had here.
+#[derive(Serialize, Deserialize)]
+struct BinaryIndex {
+    map: HashMap<u32, Vec<u8>>,
+}
+impl BinaryIndex {
+    fn new() -> Self {
+        Self {
+            map: HashMap::new(),
+        }
+    }
+    fn insert(&mut self, data: Vec<u8>) -> BinaryKey {
+        let key = self.map.len() as u32;
+        self.map.insert(key, data);
+        BinaryKey { val: key }
+    }
+    fn get(&self, key: BinaryKey) -> Option<&[u8]> {
+        self.map.get(&key.val).map(|x| &**x)
+    }
+    fn get_mut(&mut self, key: BinaryKey) -> Option<&mut Vec<u8>> {
+        self.map.get_mut(&key.val)
+    }
+}
+
 // Heh, perhaps this ought to be called a pebble.
 #[derive(Serialize, Deserialize)]
 struct Image {
@@ -203,12 +271,16 @@ struct Image {
     strings: Rodeo,
     /// At least for now, we store bindings in order.
     bindings: Vec<Binding>,
+    // bindex: BinaryIndex,
+    hello: Option<(usize, Vec<u8>)>,
 }
 impl Image {
     fn new() -> Self {
         Self {
             strings: Rodeo::new(),
             bindings: Vec::new(),
+            //bindex: BinaryIndex::new(),
+            hello: None,
         }
     }
     fn find_binding(&self, name: Spur) -> Option<&Binding> {
@@ -313,6 +385,8 @@ mod parse {
         pub(crate) Keyword : keyword {
             Print : "print",
             Let : "let",
+            Save : "save",
+            Load : "load",
         }
     }
 
@@ -375,6 +449,8 @@ mod parse {
     pub(crate) enum Command<'a> {
         Print(PrintArg<'a>),
         Bind(Identifier<'a>, Expression<'a>),
+        SaveHello,
+        LoadHello,
     }
     impl Command<'_> {
         pub(crate) fn parse<'a>(input: &'a str) -> Result<Command<'a>> {
@@ -422,6 +498,8 @@ mod parse {
                         Ok(Command::Bind(ident, exp))
                     }
                 }
+                Ok((input, Keyword::Save)) => Ok(Command::SaveHello),
+                Ok((input, Keyword::Load)) => Ok(Command::LoadHello),
                 Err(e) => Err(::anyhow::anyhow!("{}", e)),
             }
         }
@@ -468,6 +546,7 @@ fn main() -> Result<()> {
                                     Value::Integer(int) => println!("{}", int),
                                     Value::Float(float) => println!("{}", float),
                                     Value::Boolean(boolean) => println!("{}", boolean),
+                                    Value::Unit => println!("()"),
                                     Value::String(key) => {
                                         println!("{}", image.strings.resolve(&key))
                                     }
@@ -478,6 +557,27 @@ fn main() -> Result<()> {
                             }
                         }
                     },
+                    Ok(parse::Command::SaveHello) => {
+                        let (buf, start) = jit::make_x64_linux_hello();
+                        image.hello = Some((start.0, buf.to_vec()));
+                    }
+                    Ok(parse::Command::LoadHello) => {
+                        if let Some((start, ref buf)) = image.hello {
+                            let start = ::dynasmrt::AssemblyOffset(start);
+                            let mut mmapbuf =
+                                ::dynasmrt::mmap::MutableBuffer::new(buf.len()).unwrap();
+                            mmapbuf.set_len(buf.len());
+                            for (i, x) in buf.iter().enumerate() {
+                                mmapbuf[i] = *x;
+                            }
+                            let exec_buf = mmapbuf.make_exec().unwrap();
+                            let hello_fn: extern "win64" fn() =
+                                unsafe { ::core::mem::transmute(exec_buf.ptr(start)) };
+                            hello_fn();
+                        } else {
+                            println!("Machine code cache not initialized.");
+                        }
+                    }
                     Err(e) => eprintln!("parse error: {}", e),
                 }
 
@@ -488,6 +588,5 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string(&load_image(&image)?)?);
         }
     }
-
     Ok(())
 }
