@@ -96,8 +96,4 @@ mod test {
         let hello_fn: extern "win64" fn() -> bool = unsafe { ::core::mem::transmute(buf.ptr(start)) };
         assert!(hello_fn());
     }
-    #[test]
-    fn x64_linux_specific_hello() {
-        super::x64_linux_hello();
-    }
 }
