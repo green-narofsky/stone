@@ -361,10 +361,10 @@ mod parse {
         alt((tag(" "), tag("\t"), tag("\n")))(input)
     }
     macro_rules! tagged_enum {
-        ($p:vis $e:ident : $parser_name:ident {
+        ($(#[$attr:meta])* $p:vis $e:ident : $parser_name:ident {
             $($v:ident : $tag_name:literal),*$(,)?
         }) => {
-            #[derive(Debug, Copy, Clone)]
+            $(#[$attr])*
             $p enum $e {
                 $($v),*
             }
@@ -382,6 +382,7 @@ mod parse {
     }
 
     tagged_enum! {
+        #[derive(Debug, Copy, Clone)]
         pub(crate) Keyword : keyword {
             Print : "print",
             Let : "let",
