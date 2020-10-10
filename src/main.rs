@@ -383,7 +383,7 @@ mod parse {
 
     tagged_enum! {
         #[derive(Debug, Copy, Clone)]
-        pub(crate) Keyword : keyword {
+        pub(crate) CommandWord : command_word {
             Print : "print",
             Let : "let",
             Save : "save",
@@ -459,8 +459,8 @@ mod parse {
             use ::nom::bytes::complete::tag;
             use ::nom::multi::{many0, many1};
             use ::nom::sequence::tuple;
-            match keyword(input) {
-                Ok((input, Keyword::Print)) => {
+            match command_word(input) {
+                Ok((input, CommandWord::Print)) => {
                     let (input, (_, arg)) = tuple((
                         many1(whitespace),
                         alt((
@@ -482,7 +482,7 @@ mod parse {
                         Ok(Command::Print(arg))
                     }
                 }
-                Ok((input, Keyword::Let)) => {
+                Ok((input, CommandWord::Let)) => {
                     let (input, (_, ident, _, _, _, exp)) = tuple((
                         many1(whitespace),
                         identifier,
@@ -499,8 +499,8 @@ mod parse {
                         Ok(Command::Bind(ident, exp))
                     }
                 }
-                Ok((input, Keyword::Save)) => Ok(Command::SaveHello),
-                Ok((input, Keyword::Load)) => Ok(Command::LoadHello),
+                Ok((input, CommandWord::Save)) => Ok(Command::SaveHello),
+                Ok((input, CommandWord::Load)) => Ok(Command::LoadHello),
                 Err(e) => Err(::anyhow::anyhow!("{}", e)),
             }
         }
