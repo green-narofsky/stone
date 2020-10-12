@@ -355,6 +355,7 @@ fn save(path: Option<&Path>, image: &Image) -> Result<()> {
 
 mod parse {
     use ::anyhow::Result;
+    use ::std::path::Path;
     fn whitespace(input: &str) -> ::nom::IResult<&str, &str> {
         use ::nom::branch::alt;
         use ::nom::bytes::complete::tag;
@@ -362,11 +363,11 @@ mod parse {
     }
     macro_rules! tagged_enum {
         ($(#[$attr:meta])* $p:vis $e:ident : $parser_name:ident {
-            $($v:ident : $tag_name:literal),*$(,)?
+            $($(#[$var_attr:meta])* $v:ident : $tag_name:literal),*$(,)?
         }) => {
             $(#[$attr])*
             $p enum $e {
-                $($v),*
+                $($(#[$var_attr])* $v),*
             }
             fn $parser_name(input: &str) -> ::nom::IResult<&str, $e> {
                 use ::nom::bytes::complete::tag;
@@ -388,6 +389,7 @@ mod parse {
             Let : "let",
             Save : "save",
             Load : "load",
+            Remount : "mount",
         }
     }
 
@@ -452,6 +454,7 @@ mod parse {
         Bind(Identifier<'a>, Expression<'a>),
         SaveHello,
         LoadHello,
+        Remount(&'a Path),
     }
     impl Command<'_> {
         pub(crate) fn parse<'a>(input: &'a str) -> Result<Command<'a>> {
@@ -501,6 +504,15 @@ mod parse {
                 }
                 Ok((input, CommandWord::Save)) => Ok(Command::SaveHello),
                 Ok((input, CommandWord::Load)) => Ok(Command::LoadHello),
+                Ok((input, CommandWord::Remount)) => {
+                    let (input, _) = many1(whitespace)(input)
+                        .expect("command word parser should've verified presence of whitespace");
+                    // This is obviously wrong. This ends up including the trailing newline.
+                    // And, escapes are unusable.
+                    // I really should have a more principled way of handling command arguments.
+                    let path: &Path = input.as_ref();
+                    Ok(Command::Remount(path))
+                }
                 Err(e) => Err(::anyhow::anyhow!("{}", e)),
             }
         }
@@ -578,6 +590,9 @@ fn main() -> Result<()> {
                         } else {
                             println!("Machine code cache not initialized.");
                         }
+                    }
+                    Ok(parse::Command::Remount(path)) => {
+                        println!("Path: {:?}", path);
                     }
                     Err(e) => eprintln!("parse error: {}", e),
                 }
