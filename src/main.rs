@@ -405,6 +405,7 @@ enum PointerInvalidation {
     OwningMutate,
 }
 
+/// Internal identifier for a pointer, used for validation.
 struct PointerId {
     id: u64,
 }
