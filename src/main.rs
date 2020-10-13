@@ -442,8 +442,8 @@ fn main() -> Result<()> {
                                         println!("{}", image.strings.resolve(&key))
                                     }
                                     Value::Type(ty) => println!("{:?}", ty),
-                                    Value::SharedPointer(_, t) => println!("&{:?}", t),
-                                    Value::UniquePointer(_, t) => println!("&uniq {:?}", t),
+                                    Value::SharedPointer(_, t) => println!("*{:?}", t),
+                                    Value::UniquePointer(_, t) => println!("*uniq {:?}", t),
                                 }
                             } else {
                                 eprintln!("binding {} does not exist", ident.name);
