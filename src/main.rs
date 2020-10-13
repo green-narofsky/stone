@@ -9,6 +9,38 @@ use ::structopt::StructOpt;
 mod jit;
 mod parse;
 
+/// Niche optimization, lol.
+mod niche {
+    // TODO: macro-ify this so we have NonMax- types and conversions
+    // for every width integer
+    use ::core::convert::TryFrom;
+    use ::core::num::NonZeroUsize;
+    /// Like `NonZeroUsize`, but the niche is `usize::MAX`.
+    pub(crate) struct NonMaxUsize {
+        internal: NonZeroUsize,
+    }
+    impl NonMaxUsize {
+        unsafe fn new_unchecked(val: usize) -> Self {
+            Self {
+                internal: NonZeroUsize::new_unchecked(!val),
+            }
+        }
+    }
+    impl TryFrom<usize> for NonMaxUsize {
+        type Error = ::core::num::TryFromIntError;
+        fn try_from(val: usize) -> Result<Self, Self::Error> {
+            Ok(Self {
+                internal: NonZeroUsize::try_from(!val)?,
+            })
+        }
+    }
+    impl From<NonMaxUsize> for usize {
+        fn from(val: NonMaxUsize) -> Self {
+            !Self::from(val.internal)
+        }
+    }
+}
+
 /// Driver binary for Stone
 #[derive(StructOpt, Debug)]
 enum Opt {
