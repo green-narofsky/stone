@@ -322,22 +322,20 @@ impl BinaryIndex {
 enum PointerCount {
     Shared {
         // Inclusive lower bound.
-        lower_bound: niche::NonMaxUsize,
+        lower_bound: u64,
         // Exclusive upper bound.
-        next: niche::NonMaxUsize,
+        next: u64,
     },
     Unique {
-        id: niche::NonMaxUsize,
+        id: u64,
     },
     None {
-        next: niche::NonMaxUsize,
+        next: u64,
     },
 }
 impl PointerCount {
     fn new() -> Self {
-        Self::None {
-            next: niche::NonMaxUsize::try_from(0).unwrap(),
-        }
+        Self::None { next: 0 }
     }
     /// Create a new shared pointer.
     fn shared(&mut self) -> PointerId {
@@ -408,7 +406,7 @@ enum PointerInvalidation {
 }
 
 struct PointerId {
-    id: niche::NonMaxUsize,
+    id: u64,
 }
 
 #[derive(Serialize, Deserialize)]
