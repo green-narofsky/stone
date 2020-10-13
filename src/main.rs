@@ -417,7 +417,11 @@ struct Memory {
     // I have some details written out in another document.
     chunks: Vec<(Value, Type, PointerCount)>,
 }
-impl Memory {}
+impl Memory {
+    fn new() -> Self {
+        Self { chunks: Vec::new() }
+    }
+}
 
 // Heh, perhaps this ought to be called a pebble.
 #[derive(Serialize, Deserialize)]
@@ -431,7 +435,7 @@ struct Image {
     /// At least for now, we store bindings in order.
     bindings: Vec<Binding>,
     /// Memory! Finally, we can store stuff.
-    data: Vec<Value>,
+    data: Memory,
     // bindex: BinaryIndex,
     hello: Option<(usize, Vec<u8>)>,
 }
@@ -440,7 +444,7 @@ impl Image {
         Self {
             strings: Rodeo::new(),
             bindings: Vec::new(),
-            data: Vec::new(),
+            data: Memory::new(),
             //bindex: BinaryIndex::new(),
             hello: None,
         }
