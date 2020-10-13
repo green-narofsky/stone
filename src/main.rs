@@ -15,7 +15,9 @@ mod niche {
     // for every width integer
     use ::core::convert::TryFrom;
     use ::core::num::NonZeroUsize;
+    use ::serde::{Deserialize, Serialize};
     /// Like `NonZeroUsize`, but the niche is `usize::MAX`.
+    #[derive(Serialize, Deserialize, Debug)]
     pub(crate) struct NonMaxUsize {
         internal: NonZeroUsize,
     }
@@ -56,13 +58,15 @@ enum Opt {
     },
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 enum Type {
     Integer,
     Float,
     Boolean,
     Unit,
     String,
+    SharedPointer(Box<Type>),
+    UniquePointer(Box<Type>),
     Type,
 }
 
@@ -211,6 +215,8 @@ enum Value {
     // This all is just a sketch at the moment.
     // Essentially, the only string type we have at the moment is &'static str.
     String(Spur),
+    SharedPointer(niche::NonMaxUsize, Type),
+    UniquePointer(niche::NonMaxUsize, Type),
     Type(Type),
     // PureFunction(PureFunction),
 }
@@ -223,6 +229,8 @@ impl Value {
             Value::String(_) => Type::String,
             Value::Type(_) => Type::Type,
             Value::Unit => Type::Unit,
+            Value::SharedPointer(_, t) => Type::SharedPointer(Box::new(t.clone())),
+            Value::UniquePointer(_, t) => Type::UniquePointer(Box::new(t.clone())),
         }
     }
 }
@@ -425,7 +433,7 @@ fn main() -> Result<()> {
                         parse::PrintArg::Ident(ident) => {
                             let key = image.get_or_intern_string(ident.name);
                             if let Some(binding) = image.find_binding(key) {
-                                match binding.value {
+                                match &binding.value {
                                     Value::Integer(int) => println!("{}", int),
                                     Value::Float(float) => println!("{}", float),
                                     Value::Boolean(boolean) => println!("{}", boolean),
@@ -434,6 +442,8 @@ fn main() -> Result<()> {
                                         println!("{}", image.strings.resolve(&key))
                                     }
                                     Value::Type(ty) => println!("{:?}", ty),
+                                    Value::SharedPointer(_, t) => println!("&{:?}", t),
+                                    Value::UniquePointer(_, t) => println!("&uniq {:?}", t),
                                 }
                             } else {
                                 eprintln!("binding {} does not exist", ident.name);
