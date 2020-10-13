@@ -1,5 +1,6 @@
 // TODO: A basic REPL.
 use ::anyhow::Result;
+use ::core::convert::TryFrom;
 use ::lasso::{Rodeo, Spur};
 use ::serde::{Deserialize, Serialize};
 use ::std::collections::HashMap;
@@ -312,6 +313,94 @@ impl BinaryIndex {
         self.map.get_mut(&key.val)
     }
 }
+
+/// Tracking the existence of valid pointers to a chunk.
+#[derive(Serialize, Deserialize)]
+enum PointerCount {
+    Shared {
+        // Inclusive lower bound.
+        lower_bound: niche::NonMaxUsize,
+        // Exclusive upper bound.
+        next: niche::NonMaxUsize,
+    },
+    Unique {
+        id: niche::NonMaxUsize,
+    },
+    None {
+        next: niche::NonMaxUsize,
+    },
+}
+impl PointerCount {
+    fn new() -> Self {
+        Self::None {
+            next: niche::NonMaxUsize::try_from(0).unwrap(),
+        }
+    }
+    /// Create a new shared pointer.
+    fn shared(&mut self) -> PointerId {
+        match self {
+            Self::Shared { next, .. } => {
+                let id = PointerId { id: *next };
+                *next += 1;
+                id
+            }
+            Self::Unique { id } => {
+                let id = *id;
+                *self = Self::Shared {
+                    lower_bound: id + 1,
+                    next: id + 2,
+                };
+                PointerId { id: id + 1 }
+            }
+            Self::None { next } => {
+                let id = *next;
+                *self = Self::Shared {
+                    lower_bound: id,
+                    next: id + 1,
+                };
+                PointerId { id }
+            }
+        }
+    }
+    /// Create a new unique pointer.
+    fn unique(&mut self) -> PointerId {
+        match self {
+            Self::Shared { next, .. } => {
+                let id = *next + 1;
+                *self = Self::Unique { id };
+                PointerId { id }
+            }
+            Self::Unique { id } => {
+                let new_id = *id + 1;
+                *id = new_id;
+                PointerId { id: new_id }
+            }
+            Self::None { next } => {
+                let id = *next;
+                *self = Self::Unique { id };
+                PointerId { id }
+            }
+        }
+    }
+}
+
+enum PointerInvalidation {
+    OwningRead,
+    OwningMutate,
+}
+
+struct PointerId {
+    id: niche::NonMaxUsize,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Memory {
+    // This is inefficient, but necessary for making sure
+    // the interpreted version and compiled version share the same semantics.
+    // I have some details written out in another document.
+    chunks: Vec<(Value, Type, PointerCount)>,
+}
+impl Memory {}
 
 // Heh, perhaps this ought to be called a pebble.
 #[derive(Serialize, Deserialize)]
