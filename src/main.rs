@@ -1,4 +1,7 @@
 // TODO: A basic REPL.
+// A goal is that we have a "UB exception", where in interpreted code
+// all UB aborts the program.
+// Much like Miri for Rust.
 use ::anyhow::Result;
 use ::core::convert::TryFrom;
 use ::lasso::{Rodeo, Spur};
