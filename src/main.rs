@@ -15,9 +15,10 @@ mod niche {
     // for every width integer
     use ::core::convert::TryFrom;
     use ::core::num::NonZeroUsize;
+    use ::core::ops::{Add, AddAssign};
     use ::serde::{Deserialize, Serialize};
     /// Like `NonZeroUsize`, but the niche is `usize::MAX`.
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
     pub(crate) struct NonMaxUsize {
         internal: NonZeroUsize,
     }
@@ -39,6 +40,17 @@ mod niche {
     impl From<NonMaxUsize> for usize {
         fn from(val: NonMaxUsize) -> Self {
             !Self::from(val.internal)
+        }
+    }
+    impl Add<usize> for NonMaxUsize {
+        type Output = NonMaxUsize;
+        fn add(self, rhs: usize) -> Self::Output {
+            Self::try_from(usize::from(self) + rhs).expect("expected non-max usize")
+        }
+    }
+    impl AddAssign<usize> for NonMaxUsize {
+        fn add_assign(&mut self, rhs: usize) {
+            *self = *self + rhs;
         }
     }
 }
