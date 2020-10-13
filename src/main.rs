@@ -81,8 +81,7 @@ enum Type {
     Boolean,
     Unit,
     String,
-    SharedPointer(Box<Type>),
-    UniquePointer(Box<Type>),
+    Pointer(PointerKind, Box<Type>),
     Type,
 }
 
@@ -216,6 +215,12 @@ struct ProductType {
     fields: Vec<Type>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+enum PointerKind {
+    Shared,
+    Unique,
+}
+
 // Note that for the prim_funcs macro, we require
 // the Type enum and Value enum to have the same name
 // for every variant.
@@ -231,8 +236,7 @@ enum Value {
     // This all is just a sketch at the moment.
     // Essentially, the only string type we have at the moment is &'static str.
     String(Spur),
-    SharedPointer(niche::NonMaxUsize, Type),
-    UniquePointer(niche::NonMaxUsize, Type),
+    Pointer(PointerKind, niche::NonMaxUsize, Type),
     Type(Type),
     // PureFunction(PureFunction),
 }
@@ -245,8 +249,7 @@ impl Value {
             Value::String(_) => Type::String,
             Value::Type(_) => Type::Type,
             Value::Unit => Type::Unit,
-            Value::SharedPointer(_, t) => Type::SharedPointer(Box::new(t.clone())),
-            Value::UniquePointer(_, t) => Type::UniquePointer(Box::new(t.clone())),
+            Value::Pointer(k, _, t) => Type::Pointer(*k, Box::new(t.clone())),
         }
     }
 }
@@ -318,7 +321,7 @@ impl BinaryIndex {
 }
 
 /// Tracking the existence of valid pointers to a chunk.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 enum PointerCount {
     Shared {
         // Inclusive lower bound.
@@ -397,6 +400,16 @@ impl PointerCount {
             (OwningMutate, _) => (),
         }
     }
+    /// Check if a given combination of pointer kind and ID is valid.
+    fn is_valid(&self, kind: PointerKind, ptr: PointerId) -> bool {
+        match (self, kind) {
+            (Self::Shared { lower_bound, next }, PointerKind::Shared) => {
+                ptr.id >= *lower_bound && ptr.id < *next
+            }
+            (Self::Unique { id }, PointerKind::Unique) => ptr.id == *id,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -410,16 +423,32 @@ struct PointerId {
     id: u64,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct Chunk {
+    value: Value,
+    chunk_type: Type,
+    pointers: PointerCount,
+}
+
+/// A location in memory.
+struct Location {
+    offset: niche::NonMaxUsize,
+}
+
+/// A big heap of data, lol.
 #[derive(Serialize, Deserialize)]
 struct Memory {
     // This is inefficient, but necessary for making sure
     // the interpreted version and compiled version share the same semantics.
     // I have some details written out in another document.
-    chunks: Vec<(Value, Type, PointerCount)>,
+    chunks: Vec<Chunk>,
 }
 impl Memory {
     fn new() -> Self {
         Self { chunks: Vec::new() }
+    }
+    fn insert(&mut self, val: Value) -> Location {
+        todo!("memory value insertion")
     }
 }
 
@@ -564,8 +593,12 @@ fn main() -> Result<()> {
                                         println!("{}", image.strings.resolve(&key))
                                     }
                                     Value::Type(ty) => println!("{:?}", ty),
-                                    Value::SharedPointer(_, t) => println!("*{:?}", t),
-                                    Value::UniquePointer(_, t) => println!("*uniq {:?}", t),
+                                    Value::Pointer(PointerKind::Shared, _, t) => {
+                                        println!("*{:?}", t)
+                                    }
+                                    Value::Pointer(PointerKind::Unique, _, t) => {
+                                        println!("*uniq {:?}", t)
+                                    }
                                 }
                             } else {
                                 eprintln!("binding {} does not exist", ident.name);
