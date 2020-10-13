@@ -382,8 +382,23 @@ impl PointerCount {
             }
         }
     }
+    /// Load a pointer invalidation.
+    fn invalidate(&mut self, invalidation: PointerInvalidation) {
+        use PointerInvalidation::*;
+        match (invalidation, &self) {
+            (OwningRead, Self::Unique { id }) => {
+                let next = *id + 1;
+                *self = Self::None { next };
+            }
+            (OwningRead, _) => (),
+            (OwningMutate, Self::Shared { next, .. }) => *self = Self::None { next: *next },
+            (OwningMutate, Self::Unique { id }) => *self = Self::None { next: *id + 1 },
+            (OwningMutate, _) => (),
+        }
+    }
 }
 
+#[derive(Clone, Copy, Debug)]
 enum PointerInvalidation {
     OwningRead,
     OwningMutate,
