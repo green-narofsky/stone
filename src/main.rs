@@ -304,6 +304,8 @@ struct Image {
     strings: Rodeo,
     /// At least for now, we store bindings in order.
     bindings: Vec<Binding>,
+    /// Memory! Finally, we can store stuff.
+    data: Vec<Value>,
     // bindex: BinaryIndex,
     hello: Option<(usize, Vec<u8>)>,
 }
@@ -312,6 +314,7 @@ impl Image {
         Self {
             strings: Rodeo::new(),
             bindings: Vec::new(),
+            data: Vec::new(),
             //bindex: BinaryIndex::new(),
             hello: None,
         }
