@@ -221,6 +221,15 @@ enum PointerKind {
     Unique,
 }
 
+/// A pointer to a chunk.
+#[derive(Serialize, Deserialize, Debug)]
+struct Pointer {
+    kind: PointerKind,
+    location: Location,
+    id: PointerId,
+    chunk_type: Type,
+}
+
 // Note that for the prim_funcs macro, we require
 // the Type enum and Value enum to have the same name
 // for every variant.
@@ -236,7 +245,7 @@ enum Value {
     // This all is just a sketch at the moment.
     // Essentially, the only string type we have at the moment is &'static str.
     String(Spur),
-    Pointer(PointerKind, Location, PointerId, Type),
+    Pointer(Pointer),
     Type(Type),
     // PureFunction(PureFunction),
 }
@@ -249,7 +258,9 @@ impl Value {
             Value::String(_) => Type::String,
             Value::Type(_) => Type::Type,
             Value::Unit => Type::Unit,
-            Value::Pointer(k, _, _, t) => Type::Pointer(*k, Box::new(t.clone())),
+            Value::Pointer(Pointer {
+                kind, chunk_type, ..
+            }) => Type::Pointer(*kind, Box::new(chunk_type.clone())),
         }
     }
 }
@@ -488,6 +499,14 @@ struct Memory {
     chunks: Vec<ChunkSlot>,
     free: Option<niche::NonMaxUsize>,
 }
+/// Currently this is impossible, but I look forward
+/// to when fallible allocation becomes available.
+enum AllocError {}
+
+/// Error for when an invalid `Location` is used.
+// This is UB!
+struct InvalidLocation;
+
 impl Memory {
     fn new() -> Self {
         Self {
@@ -495,8 +514,26 @@ impl Memory {
             free: None,
         }
     }
-    fn insert(&mut self, val: Value) -> Location {
+    /// Create a new chunk containing the given value.
+    fn insert(&mut self, val: Value) -> Result<Location, AllocError> {
         todo!("memory value insertion")
+    }
+    /// Replace the value a chunk contains with a new one.
+    /// Returns the old value of the destination chunk.
+    fn replace(&mut self, dest: Location, src: Value) -> Result<Value, InvalidLocation> {
+        todo!("memory value replacement")
+    }
+    /// Read the value in a chunk.
+    fn read(&self, src: Location) -> Result<Value, InvalidLocation> {
+        todo!("reading memory")
+    }
+    /// Swap the values of two chunks.
+    fn swap(&mut self, x: Location, y: Location) -> Result<(), InvalidLocation> {
+        todo!("memory swap")
+    }
+    /// Destroy a chunk.
+    fn destroy(&mut self, loc: Location) -> Result<(), InvalidLocation> {
+        todo!("memory chunk destruction")
     }
 }
 
@@ -641,12 +678,16 @@ fn main() -> Result<()> {
                                         println!("{}", image.strings.resolve(&key))
                                     }
                                     Value::Type(ty) => println!("{:?}", ty),
-                                    Value::Pointer(PointerKind::Shared, _, _, t) => {
-                                        println!("*{:?}", t)
-                                    }
-                                    Value::Pointer(PointerKind::Unique, _, _, t) => {
-                                        println!("*uniq {:?}", t)
-                                    }
+                                    Value::Pointer(Pointer {
+                                        kind: PointerKind::Shared,
+                                        chunk_type,
+                                        ..
+                                    }) => println!("*{:?}", chunk_type),
+                                    Value::Pointer(Pointer {
+                                        kind: PointerKind::Unique,
+                                        chunk_type,
+                                        ..
+                                    }) => println!("*uniq {:?}", chunk_type),
                                 }
                             } else {
                                 eprintln!("binding {} does not exist", ident.name);
