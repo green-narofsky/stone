@@ -222,7 +222,7 @@ enum PointerKind {
 }
 
 /// A pointer to a chunk.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct Pointer {
     kind: PointerKind,
     location: Location,
@@ -233,7 +233,7 @@ struct Pointer {
 // Note that for the prim_funcs macro, we require
 // the Type enum and Value enum to have the same name
 // for every variant.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 enum Value {
     Integer(i64),
     Float(f64),
@@ -430,7 +430,7 @@ enum PointerInvalidation {
 }
 
 /// Internal identifier for a pointer, used for validation.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct PointerId {
     id: u64,
 }
@@ -503,7 +503,7 @@ impl ChunkSlot {
 }
 
 /// The position of a place in memory.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 struct Location {
     offset: niche::NonMaxUsize,
     generation: u64,
@@ -597,14 +597,34 @@ impl Memory {
             _ => Err(InvalidLocation),
         }
     }
+    // This is an internal thing. Not to be given to Stone programs.
+    // Truthfully, `Memory::validate_location` isn't really for that either.
+    // A Stone program should know it never accesses an invalid location
+    // by construction.
+    fn get_chunk_mut(&mut self, target: Location) -> Result<&mut Chunk, InvalidLocation> {
+        self.validate_location(target)?;
+        match self.chunks[usize::from(target.offset)] {
+            ChunkSlot::Used { ref mut chunk, .. } => Ok(chunk),
+            _ => unreachable!("violation of condition we just validated"),
+        }
+    }
+    fn get_chunk(&self, target: Location) -> Result<&Chunk, InvalidLocation> {
+        self.validate_location(target)?;
+        match self.chunks[usize::from(target.offset)] {
+            ChunkSlot::Used { ref chunk, .. } => Ok(chunk),
+            _ => unreachable!("violation of condition we just validated"),
+        }
+    }
     /// Replace the value a chunk contains with a new one.
     /// Returns the old value of the destination chunk.
     fn replace(&mut self, dest: Location, src: Value) -> Result<Value, InvalidLocation> {
-        todo!("memory value replacement")
+        let chunk = self.get_chunk_mut(dest)?;
+        Ok(::core::mem::replace(&mut chunk.value, src))
     }
     /// Read the value in a chunk.
     fn read(&self, src: Location) -> Result<Value, InvalidLocation> {
-        todo!("reading memory")
+        let chunk = self.get_chunk(src)?;
+        Ok(chunk.value.clone())
     }
     /// Swap the values of two chunks.
     fn swap(&mut self, x: Location, y: Location) -> Result<(), InvalidLocation> {
