@@ -236,7 +236,7 @@ enum Value {
     // This all is just a sketch at the moment.
     // Essentially, the only string type we have at the moment is &'static str.
     String(Spur),
-    Pointer(PointerKind, niche::NonMaxUsize, Type),
+    Pointer(PointerKind, niche::NonMaxUsize, PointerId, Type),
     Type(Type),
     // PureFunction(PureFunction),
 }
@@ -249,7 +249,7 @@ impl Value {
             Value::String(_) => Type::String,
             Value::Type(_) => Type::Type,
             Value::Unit => Type::Unit,
-            Value::Pointer(k, _, t) => Type::Pointer(*k, Box::new(t.clone())),
+            Value::Pointer(k, _, _, t) => Type::Pointer(*k, Box::new(t.clone())),
         }
     }
 }
@@ -419,6 +419,7 @@ enum PointerInvalidation {
 }
 
 /// Internal identifier for a pointer, used for validation.
+#[derive(Serialize, Deserialize, Debug)]
 struct PointerId {
     id: u64,
 }
@@ -593,10 +594,10 @@ fn main() -> Result<()> {
                                         println!("{}", image.strings.resolve(&key))
                                     }
                                     Value::Type(ty) => println!("{:?}", ty),
-                                    Value::Pointer(PointerKind::Shared, _, t) => {
+                                    Value::Pointer(PointerKind::Shared, _, _, t) => {
                                         println!("*{:?}", t)
                                     }
-                                    Value::Pointer(PointerKind::Unique, _, t) => {
+                                    Value::Pointer(PointerKind::Unique, _, _, t) => {
                                         println!("*uniq {:?}", t)
                                     }
                                 }
