@@ -27,7 +27,7 @@ mod niche {
         internal: NonZeroUsize,
     }
     impl NonMaxUsize {
-        unsafe fn new_unchecked(val: usize) -> Self {
+        pub(crate) unsafe fn new_unchecked(val: usize) -> Self {
             Self {
                 internal: NonZeroUsize::new_unchecked(!val),
             }
@@ -74,7 +74,7 @@ enum Opt {
     },
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 enum Type {
     Integer,
     Float,
@@ -215,7 +215,7 @@ struct ProductType {
     fields: Vec<Type>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 enum PointerKind {
     Shared,
     Unique,
@@ -441,7 +441,27 @@ struct Chunk {
     value: Value,
     chunk_type: Type,
     pointers: PointerCount,
-    generation: u64,
+}
+struct TypeMismatch;
+impl Chunk {
+    fn new(value: Value, chunk_type: Type) -> Result<Self, TypeMismatch> {
+        if value.type_of() == chunk_type {
+            Ok(Self {
+                value,
+                chunk_type,
+                pointers: PointerCount::new(),
+            })
+        } else {
+            Err(TypeMismatch)
+        }
+    }
+    fn from_val(value: Value) -> Self {
+        Self {
+            chunk_type: value.type_of(),
+            pointers: PointerCount::new(),
+            value,
+        }
+    }
 }
 
 // We'll want to avoid saving freed chunks in images, later.
@@ -449,7 +469,10 @@ struct Chunk {
 // existing `Location`s in the process of saving.
 #[derive(Serialize, Deserialize)]
 enum ChunkSlot {
-    Used(Chunk),
+    Used {
+        chunk: Chunk,
+        generation: u64,
+    },
     Free {
         // Might as well store the free list embedded in
         // the vector of chunks.
@@ -463,6 +486,20 @@ enum ChunkSlot {
         next: Option<niche::NonMaxUsize>,
         generation: u64,
     },
+}
+impl ChunkSlot {
+    fn empty(next: Option<niche::NonMaxUsize>) -> Self {
+        Self::Free {
+            generation: 0,
+            next,
+        }
+    }
+    fn used(chunk: Chunk) -> Self {
+        Self::Used {
+            generation: 0,
+            chunk,
+        }
+    }
 }
 
 /// The position of a place in memory.
@@ -515,8 +552,37 @@ impl Memory {
         }
     }
     /// Create a new chunk containing the given value.
+    // This should be the only way to actually obtain a `Location`.
     fn insert(&mut self, val: Value) -> Result<Location, AllocError> {
-        todo!("memory value insertion")
+        match self.free {
+            Some(x) => {
+                let slot: &mut ChunkSlot = &mut self.chunks[usize::from(x)];
+                let (generation, next) = match slot {
+                    ChunkSlot::Free { generation, next } => (*generation, *next),
+                    ChunkSlot::Used { .. } => unreachable!("attempted reuse of non-free chunk"),
+                };
+                self.free = next;
+                *slot = ChunkSlot::Used {
+                    chunk: Chunk::from_val(val),
+                    generation,
+                };
+                Ok(Location {
+                    offset: x,
+                    generation,
+                })
+            }
+            None => {
+                // SAFETY: The `Vec` length limit is actually `isize::MAX`,
+                // which is smaller than `usize::MAX`. Therefore,
+                // there is no way the returned value of `self.chunks.len()` is `usize::MAX`.
+                let offset = unsafe { niche::NonMaxUsize::new_unchecked(self.chunks.len()) };
+                self.chunks.push(ChunkSlot::used(Chunk::from_val(val)));
+                Ok(Location {
+                    generation: 0,
+                    offset,
+                })
+            }
+        }
     }
     /// Replace the value a chunk contains with a new one.
     /// Returns the old value of the destination chunk.
