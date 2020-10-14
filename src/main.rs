@@ -433,6 +433,27 @@ struct Chunk {
     generation: u64,
 }
 
+// We'll want to avoid saving freed chunks in images, later.
+// But for now, we keep them around so we don't have to rewrite all
+// existing `Location`s in the process of saving.
+#[derive(Serialize, Deserialize)]
+enum ChunkSlot {
+    Used(Chunk),
+    Free {
+        // Might as well store the free list embedded in
+        // the vector of chunks.
+        // We could just as well only increment the generation
+        // when chunks are freed, and store a separate table
+        // of free slots. This would slightly increase the speed
+        // of chunk accesses, and decrease the speed of chunk allocation.
+        // This slight increase would be due to only having to check
+        // the generation, instead of having to check first if the
+        // slot is in use before checking the generation.
+        next: Option<niche::NonMaxUsize>,
+        generation: u64,
+    },
+}
+
 /// The position of a place in memory.
 #[derive(Serialize, Deserialize, Debug)]
 struct Location {
@@ -464,7 +485,7 @@ struct Memory {
     // This is inefficient, but necessary for making sure
     // the interpreted version and compiled version share the same semantics.
     // I have some details written out in another document.
-    chunks: Vec<Chunk>,
+    chunks: Vec<ChunkSlot>,
 }
 impl Memory {
     fn new() -> Self {
