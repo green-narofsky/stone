@@ -236,7 +236,7 @@ enum Value {
     // This all is just a sketch at the moment.
     // Essentially, the only string type we have at the moment is &'static str.
     String(Spur),
-    Pointer(PointerKind, niche::NonMaxUsize, PointerId, Type),
+    Pointer(PointerKind, Location, PointerId, Type),
     Type(Type),
     // PureFunction(PureFunction),
 }
@@ -424,6 +424,7 @@ struct PointerId {
     id: u64,
 }
 
+/// A place in memory.
 #[derive(Serialize, Deserialize, Debug)]
 struct Chunk {
     value: Value,
@@ -432,11 +433,30 @@ struct Chunk {
 }
 
 /// A location in memory.
+#[derive(Serialize, Deserialize, Debug)]
 struct Location {
     offset: niche::NonMaxUsize,
 }
 
 /// A big heap of data, lol.
+// This needs to support destroying chunks,
+// and all pointers to destroyed chunks are invalidated.
+// We could accomplish this by giving chunks an invalidated state,
+// and simply checking that on every access.
+// That would become untenable in situations with frequent reallocation,
+// however.
+// We could put a layer of indirection between chunks
+// and pointers, with some sort of global map that uses what would ordinarily be
+// offsets as keys instead.
+// This shrinks the memory usage considerably, but slows down pointer dereferences.
+// Considering how frequent pointers will be, and how free to use I intend to
+// make them in the compiled version, this isn't a very good option either.
+// We could instead store an extra generation key in each chunk and pointer,
+// which would allow us to reuse the space from destroyed chunks,
+// while not requiring a map lookup for every access.
+// This has the cost of requiring a few more bytes of storage for every
+// chunk and pointer, but the speedup should make up for the (relatively tiny)
+// cost of copying those around.
 #[derive(Serialize, Deserialize)]
 struct Memory {
     // This is inefficient, but necessary for making sure
