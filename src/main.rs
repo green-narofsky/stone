@@ -430,12 +430,14 @@ struct Chunk {
     value: Value,
     chunk_type: Type,
     pointers: PointerCount,
+    generation: u64,
 }
 
-/// A location in memory.
+/// The position of a place in memory.
 #[derive(Serialize, Deserialize, Debug)]
 struct Location {
     offset: niche::NonMaxUsize,
+    generation: u64,
 }
 
 /// A big heap of data, lol.
