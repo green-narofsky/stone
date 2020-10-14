@@ -588,6 +588,7 @@ impl Memory {
     ///  - Its `offset` points to an existing `ChunkSlot`.
     ///  - Its `generation` key matches the corresponding `ChunkSlot`'s `generation` key.
     ///  - The indicated `ChunkSlot` is alive.
+    ///
     /// Note that the first condition in that list is currently infallible,
     /// due to restrictions on the creation of `Location`s.
     fn validate_location(&self, target: Location) -> Result<(), InvalidLocation> {
