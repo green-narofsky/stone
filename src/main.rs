@@ -558,7 +558,7 @@ impl Memory {
             Some(x) => {
                 let slot: &mut ChunkSlot = &mut self.chunks[usize::from(x)];
                 let (generation, next) = match slot {
-                    ChunkSlot::Free { generation, next } => (*generation, *next),
+                    ChunkSlot::Free { generation, next } => (*generation + 1, *next),
                     ChunkSlot::Used { .. } => unreachable!("attempted reuse of non-free chunk"),
                 };
                 self.free = next;
