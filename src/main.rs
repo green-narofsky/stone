@@ -486,10 +486,14 @@ struct Memory {
     // the interpreted version and compiled version share the same semantics.
     // I have some details written out in another document.
     chunks: Vec<ChunkSlot>,
+    free: Option<niche::NonMaxUsize>,
 }
 impl Memory {
     fn new() -> Self {
-        Self { chunks: Vec::new() }
+        Self {
+            chunks: Vec::new(),
+            free: None,
+        }
     }
     fn insert(&mut self, val: Value) -> Location {
         todo!("memory value insertion")
