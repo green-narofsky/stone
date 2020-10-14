@@ -584,6 +584,18 @@ impl Memory {
             }
         }
     }
+    /// A `Location` is valid if and only if the following conditions are met:
+    ///  - Its `offset` points to an existing `ChunkSlot`.
+    ///  - Its `generation` key matches the corresponding `ChunkSlot`'s `generation` key.
+    ///  - The indicated `ChunkSlot` is alive.
+    /// Note that the first condition in that list is currently infallible,
+    /// due to restrictions on the creation of `Location`s.
+    fn validate_location(&self, target: Location) -> Result<(), InvalidLocation> {
+        match self.chunks[usize::from(target.offset)] {
+            ChunkSlot::Used { generation, .. } if generation == target.generation => Ok(()),
+            _ => Err(InvalidLocation),
+        }
+    }
     /// Replace the value a chunk contains with a new one.
     /// Returns the old value of the destination chunk.
     fn replace(&mut self, dest: Location, src: Value) -> Result<Value, InvalidLocation> {
