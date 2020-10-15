@@ -658,6 +658,7 @@ impl Memory {
         Ok(chunk.value.clone())
     }
     /// Swap the values of two chunks.
+    // TODO: verify that the two `Location`s do not point to the same offset.
     fn swap(&mut self, x: Location, y: Location) -> Result<(), MutateError> {
         self.validate_location(x)?;
         self.validate_location(y)?;
