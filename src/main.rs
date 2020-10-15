@@ -22,7 +22,7 @@ mod niche {
     use ::core::ops::{Add, AddAssign};
     use ::serde::{Deserialize, Serialize};
     /// Like `NonZeroUsize`, but the niche is `usize::MAX`.
-    #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+    #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
     pub(crate) struct NonMaxUsize {
         internal: NonZeroUsize,
     }
@@ -663,7 +663,8 @@ impl Memory {
     /// Read the value in a chunk.
     // TODO: figure out if this can be done without
     // hiding UB from the interpreter
-    fn read(&self, src: Location) -> Result<Value, InvalidLocation> {
+    fn read(&mut self, src: Location) -> Result<Value, InvalidLocation> {
+        // This needs to invalidate unique pointers.
         let chunk = self.get_chunk(src)?;
         Ok(chunk.value.clone())
     }
@@ -742,6 +743,7 @@ impl Memory {
     // this condition.
     // Perhaps we should check this in that method, as well?
     fn ptr_swap(&mut self, dest: Pointer, src: Pointer) -> Result<(), WrongKind> {
+        assert_ne!(dest.location.offset, src.location.offset);
         todo!("swapping through pointers")
     }
 }
