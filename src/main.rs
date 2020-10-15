@@ -222,6 +222,14 @@ enum PointerKind {
 }
 
 /// A pointer to a chunk.
+// Tbh, cloning this should be fallible.
+// Or, rather, it's a bug in this interpreter
+// if I invoke `.clone()` on a unique pointer.
+// Except, is it possible to do `Memory::read`
+// without this? Consider manually implementing
+// `Clone` or some corresponding inherent method
+// to set some kind of validity flag,
+// or otherwise sort out this potential hidden UB.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct Pointer {
     kind: PointerKind,
@@ -653,6 +661,8 @@ impl Memory {
         }
     }
     /// Read the value in a chunk.
+    // TODO: figure out if this can be done without
+    // hiding UB from the interpreter
     fn read(&self, src: Location) -> Result<Value, InvalidLocation> {
         let chunk = self.get_chunk(src)?;
         Ok(chunk.value.clone())
@@ -718,9 +728,19 @@ impl Memory {
             _ => Err(InvalidLocation),
         }
     }
+    /// Replace the value of a chunk through a pointer.
     fn ptr_replace(&mut self, dest: Pointer, src: Value) -> Result<Value, WrongKind> {
         todo!("replacement through pointers")
     }
+    /// Swap the values of two chunks through pointers.
+    // I'd say we need to validate that the two pointers
+    // don't point to the same chunk, but mutation is only
+    // permitted through unique pointers.
+    // Unique pointers have their uniqueness enforced elsewhere,
+    // so we don't need to do it here.
+    // Except, that's not true. `Memory::read` can be used to violate
+    // this condition.
+    // Perhaps we should check this in that method, as well?
     fn ptr_swap(&mut self, dest: Pointer, src: Pointer) -> Result<(), WrongKind> {
         todo!("swapping through pointers")
     }
