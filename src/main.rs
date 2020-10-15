@@ -230,7 +230,7 @@ enum PointerKind {
 // `Clone` or some corresponding inherent method
 // to set some kind of validity flag,
 // or otherwise sort out this potential hidden UB.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 struct Pointer {
     kind: PointerKind,
     location: Location,
@@ -438,7 +438,7 @@ enum PointerInvalidation {
 }
 
 /// Internal identifier for a pointer, used for validation.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 struct PointerId {
     id: u64,
 }
@@ -511,7 +511,7 @@ impl ChunkSlot {
 }
 
 /// The position of a place in memory.
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 struct Location {
     offset: niche::NonMaxUsize,
     generation: u64,
@@ -666,7 +666,16 @@ impl Memory {
     fn read(&mut self, src: Location) -> Result<Value, InvalidLocation> {
         // This needs to invalidate unique pointers.
         let chunk = self.get_chunk(src)?;
-        Ok(chunk.value.clone())
+        let val = match &chunk.value {
+            Value::Integer(i) => Value::Integer(*i),
+            Value::Float(f) => Value::Float(*f),
+            Value::Boolean(b) => Value::Boolean(*b),
+            Value::Unit => Value::Unit,
+            Value::String(spur) => Value::String(*spur),
+            Value::Type(ty) => Value::Type(ty.clone()),
+            Value::Pointer(ptr) => todo!("memory read on pointers"),
+        };
+        Ok(val)
     }
     /// Swap the values of two chunks.
     // TODO: verify that the two `Location`s do not point to the same offset.
@@ -743,7 +752,7 @@ impl Memory {
     // this condition.
     // Perhaps we should check this in that method, as well?
     fn ptr_swap(&mut self, dest: Pointer, src: Pointer) -> Result<(), WrongKind> {
-        assert_ne!(dest.location.offset, src.location.offset);
+        assert_ne!(dest, src);
         todo!("swapping through pointers")
     }
 }
