@@ -544,6 +544,8 @@ enum AllocError {}
 // This is UB!
 struct InvalidLocation;
 
+/// Error for when an invalid mutation is attempted.
+// This is UB!
 enum MutateError {
     TypeMismatch,
     InvalidLocation,
@@ -554,6 +556,21 @@ impl From<InvalidLocation> for MutateError {
     }
 }
 
+/// Error for when an invalid pointer is dereferenced.
+// This is UB!
+enum InvalidPointer {
+    IdMismatch,
+    InvalidLocation,
+}
+impl From<InvalidLocation> for InvalidPointer {
+    fn from(_: InvalidLocation) -> Self {
+        Self::InvalidLocation
+    }
+}
+
+struct WrongKind;
+// TODO: operations via `Location`s need to load pointer invalidations
+// this includes `Memory::read`.
 impl Memory {
     fn new() -> Self {
         Self {
@@ -699,6 +716,12 @@ impl Memory {
             },
             _ => Err(InvalidLocation),
         }
+    }
+    fn ptr_replace(&mut self, dest: Pointer, src: Value) -> Result<Value, WrongKind> {
+        todo!("replacement through pointers")
+    }
+    fn ptr_swap(&mut self, dest: Pointer, src: Pointer) -> Result<(), WrongKind> {
+        todo!("swapping through pointers")
     }
 }
 
