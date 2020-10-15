@@ -663,8 +663,20 @@ impl Memory {
         }
     }
     /// Destroy a chunk.
-    fn destroy(&mut self, loc: Location) -> Result<(), InvalidLocation> {
-        todo!("memory chunk destruction")
+    // Perhaps this should return the value from the chunk being obliterated.
+    fn destroy(&mut self, target: Location) -> Result<(), InvalidLocation> {
+        let slot = &mut self.chunks[usize::from(target.offset)];
+        match slot {
+            ChunkSlot::Used { generation, .. } if *generation == target.generation => {
+                *slot = ChunkSlot::Free {
+                    next: self.free,
+                    generation: *generation,
+                };
+                self.free = Some(target.offset);
+                Ok(())
+            },
+            _ => Err(InvalidLocation),
+        }
     }
     /// Create a pointer to a chunk.
     fn make_ptr(&mut self, target: Location, kind: PointerKind) -> Result<Pointer, InvalidLocation> {
