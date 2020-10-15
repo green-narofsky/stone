@@ -544,6 +544,16 @@ enum AllocError {}
 // This is UB!
 struct InvalidLocation;
 
+enum MutateError {
+    TypeMismatch,
+    InvalidLocation,
+}
+impl From<InvalidLocation> for MutateError {
+    fn from(_: InvalidLocation) -> Self {
+        Self::InvalidLocation
+    }
+}
+
 impl Memory {
     fn new() -> Self {
         Self {
@@ -617,9 +627,13 @@ impl Memory {
     }
     /// Replace the value a chunk contains with a new one.
     /// Returns the old value of the destination chunk.
-    fn replace(&mut self, dest: Location, src: Value) -> Result<Value, InvalidLocation> {
+    fn replace(&mut self, dest: Location, src: Value) -> Result<Value, MutateError> {
         let chunk = self.get_chunk_mut(dest)?;
-        Ok(::core::mem::replace(&mut chunk.value, src))
+        if chunk.chunk_type == src.type_of() {
+            Ok(::core::mem::replace(&mut chunk.value, src))
+        } else {
+            Err(MutateError::TypeMismatch)
+        }
     }
     /// Read the value in a chunk.
     fn read(&self, src: Location) -> Result<Value, InvalidLocation> {
@@ -627,8 +641,26 @@ impl Memory {
         Ok(chunk.value.clone())
     }
     /// Swap the values of two chunks.
-    fn swap(&mut self, x: Location, y: Location) -> Result<(), InvalidLocation> {
-        todo!("memory swap")
+    fn swap(&mut self, x: Location, y: Location) -> Result<(), MutateError> {
+        self.validate_location(x)?;
+        self.validate_location(y)?;
+        let (x, y) = (usize::from(x.offset), usize::from(y.offset));
+        let (x, y) = if x > y {
+            let tup = self.chunks.split_at_mut(x);
+            (&mut tup.1[0], &mut tup.0[y])
+        } else {
+            let tup = self.chunks.split_at_mut(y);
+            (&mut tup.0[x], &mut tup.1[0])
+        };
+        if let (ChunkSlot::Used { chunk: x, .. }, ChunkSlot::Used { chunk: y, .. }) = (x, y) {
+            if x.chunk_type == y.chunk_type {
+                Ok(::core::mem::swap(&mut x.value, &mut y.value))
+            } else {
+                Err(MutateError::TypeMismatch)
+            }
+        } else {
+            unreachable!("violation of condition we just validated")
+        }
     }
     /// Destroy a chunk.
     fn destroy(&mut self, loc: Location) -> Result<(), InvalidLocation> {
