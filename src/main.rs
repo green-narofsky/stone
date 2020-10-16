@@ -666,14 +666,46 @@ impl Memory {
     fn read(&mut self, src: Location) -> Result<Value, InvalidLocation> {
         // This needs to invalidate unique pointers.
         let chunk = self.get_chunk(src)?;
-        let val = match &chunk.value {
-            Value::Integer(i) => Value::Integer(*i),
-            Value::Float(f) => Value::Float(*f),
-            Value::Boolean(b) => Value::Boolean(*b),
+        let val = match chunk.value {
+            Value::Integer(i) => Value::Integer(i),
+            Value::Float(f) => Value::Float(f),
+            Value::Boolean(b) => Value::Boolean(b),
             Value::Unit => Value::Unit,
-            Value::String(spur) => Value::String(*spur),
-            Value::Type(ty) => Value::Type(ty.clone()),
-            Value::Pointer(ptr) => todo!("memory read on pointers"),
+            Value::String(spur) => Value::String(spur),
+            Value::Type(ref ty) => Value::Type(ty.clone()),
+            Value::Pointer(ref ptr) => {
+                match ptr.kind {
+                    // CORRECTNESS: Since shared pointers are shared,
+                    // it doesn't actually matter whether there exist multiple
+                    // with the same id. The way they'll be invalidated is the same,
+                    // as will be their usage.
+                    PointerKind::Shared => Value::Pointer(ptr.clone()),
+                    // This, on the other hand, must take care to invalidate the existing pointer.
+                    // It must also not construct a new valid pointer if the pointer
+                    // being read is currently invalid.
+                    // This is because doing so would invalidate an existing valid
+                    // pointer elsewhere, which makes no sense at all.
+                    //
+                    // In summary:
+                    // Memory::read on a valid unique pointer should return a valid pointer
+                    // and invalidate the pointer in memory.
+                    // Memory::read on an invalid unique pointer should return an invalid pointer.
+                    PointerKind::Unique => {
+                        let Pointer { kind: _, location, id, chunk_type } = ptr;
+                        let offset = usize::from(location.offset);
+                        let gen = location.generation;
+                        let slot: &mut ChunkSlot = &mut self.chunks[offset];
+                        match slot {
+                            ChunkSlot::Used { chunk, generation } if *generation == gen => {
+                                
+                            },
+                            // Here, the pointer
+                            _ => todo!("return an invalid pointer"),
+                        }
+                        todo!("memory read on unique pointers")
+                    },
+                }
+            },
         };
         Ok(val)
     }
