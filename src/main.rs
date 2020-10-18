@@ -665,7 +665,10 @@ impl Memory {
     // hiding UB from the interpreter
     fn read(&mut self, src: Location) -> Result<Value, InvalidLocation> {
         // This needs to invalidate unique pointers.
-        let chunk = self.get_chunk(src)?;
+        let chunk = self.get_chunk_mut(src)?;
+        // This is correct IFF all calls to Memory::read are owning reads.
+        // I believe that's the case, since we're defining ptr_* methods as well.
+        chunk.pointers.invalidate(PointerInvalidation::OwningRead);
         let val = match chunk.value {
             Value::Integer(i) => Value::Integer(i),
             Value::Float(f) => Value::Float(f),
