@@ -760,28 +760,33 @@ impl Memory {
                 };
                 self.free = Some(target.offset);
                 Ok(())
-            },
+            }
             _ => Err(InvalidLocation),
         }
     }
     /// Create a pointer to a chunk.
-    fn make_ptr(&mut self, target: Location, kind: PointerKind) -> Result<Pointer, InvalidLocation> {
+    fn make_ptr(
+        &mut self,
+        target: Location,
+        kind: PointerKind,
+    ) -> Result<Pointer, InvalidLocation> {
         match self.chunks[usize::from(target.offset)] {
-            ChunkSlot::Used { ref mut chunk, generation } if generation == target.generation => {
-                match kind {
-                    kind @ PointerKind::Unique => Ok(Pointer {
-                        id: chunk.pointers.unique(),
-                        location: target,
-                        chunk_type: chunk.chunk_type.clone(),
-                        kind,
-                    }),
-                    kind @ PointerKind::Shared => Ok(Pointer {
-                        id: chunk.pointers.shared(),
-                        location: target,
-                        chunk_type: chunk.chunk_type.clone(),
-                        kind,
-                    }),
-                }
+            ChunkSlot::Used {
+                ref mut chunk,
+                generation,
+            } if generation == target.generation => match kind {
+                kind @ PointerKind::Unique => Ok(Pointer {
+                    id: chunk.pointers.unique(),
+                    location: target,
+                    chunk_type: chunk.chunk_type.clone(),
+                    kind,
+                }),
+                kind @ PointerKind::Shared => Ok(Pointer {
+                    id: chunk.pointers.shared(),
+                    location: target,
+                    chunk_type: chunk.chunk_type.clone(),
+                    kind,
+                }),
             },
             _ => Err(InvalidLocation),
         }
