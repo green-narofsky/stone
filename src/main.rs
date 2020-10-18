@@ -691,21 +691,37 @@ impl Memory {
                     // and invalidate the pointer in memory.
                     // Memory::read on an invalid unique pointer should return an invalid pointer.
                     PointerKind::Unique => {
-                        let Pointer { kind: _, location, id, chunk_type } = ptr;
-                        let offset = usize::from(location.offset);
+                        let Pointer {
+                            kind: _,
+                            location,
+                            id,
+                            chunk_type,
+                        } = ptr;
+                        let offset = location.offset;
                         let gen = location.generation;
-                        let slot: &mut ChunkSlot = &mut self.chunks[offset];
+                        let chunk_type = chunk_type.clone();
+                        let slot: &mut ChunkSlot = &mut self.chunks[usize::from(offset)];
                         match slot {
                             ChunkSlot::Used { chunk, generation } if *generation == gen => {
-                                
-                            },
+                                let new_ptr_id = chunk.pointers.unique();
+                                let new_ptr = Pointer {
+                                    id: new_ptr_id,
+                                    kind: PointerKind::Unique,
+                                    location: Location {
+                                        generation: gen,
+                                        offset,
+                                    },
+                                    chunk_type,
+                                };
+                                return Ok(Value::Pointer(new_ptr));
+                            }
                             // Here, the pointer
                             _ => todo!("return an invalid pointer"),
                         }
                         todo!("memory read on unique pointers")
-                    },
+                    }
                 }
-            },
+            }
         };
         Ok(val)
     }
