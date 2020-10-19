@@ -700,6 +700,7 @@ impl Memory {
                             id,
                             chunk_type,
                         } = ptr;
+                        let old_id = id.clone();
                         let offset = location.offset;
                         let gen = location.generation;
                         let chunk_type = chunk_type.clone();
@@ -716,12 +717,20 @@ impl Memory {
                                     },
                                     chunk_type,
                                 };
-                                return Ok(Value::Pointer(new_ptr));
+                                Value::Pointer(new_ptr)
                             }
-                            // Here, the pointer
-                            _ => todo!("return an invalid pointer"),
+                            // Here's an invalid pointer for ya.
+                            // Just copy the whole thing.
+                            _ => Value::Pointer(Pointer {
+                                kind: PointerKind::Unique,
+                                id: old_id,
+                                location: Location {
+                                    generation: gen,
+                                    offset,
+                                },
+                                chunk_type,
+                            }),
                         }
-                        todo!("memory read on unique pointers")
                     }
                 }
             }
