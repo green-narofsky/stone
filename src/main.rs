@@ -661,8 +661,6 @@ impl Memory {
         }
     }
     /// Read the value in a chunk.
-    // TODO: figure out if this can be done without
-    // hiding UB from the interpreter
     fn read(&mut self, src: Location) -> Result<Value, InvalidLocation> {
         // This needs to invalidate unique pointers.
         let chunk = self.get_chunk_mut(src)?;
