@@ -576,7 +576,9 @@ impl From<InvalidLocation> for InvalidPointer {
     }
 }
 
+/// Error indicating a pointer of the wrong kind was used.
 struct WrongKind;
+
 // TODO: operations via `Location`s need to load pointer invalidations
 // this includes `Memory::read`.
 impl Memory {
