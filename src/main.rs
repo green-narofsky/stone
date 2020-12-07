@@ -544,6 +544,18 @@ struct Memory {
     chunks: Vec<ChunkSlot>,
     free: Option<niche::NonMaxUsize>,
 }
+macro_rules! from_zsts {
+    ($name:ident = $($variant:ident)|*) => {
+        $(
+        impl From<$variant> for $name {
+            fn from(_: $variant) -> Self {
+                Self::$variant
+            }
+        }
+        )*
+    }
+}
+
 /// Currently this is impossible, but I look forward
 /// to when fallible allocation becomes available.
 enum AllocError {}
@@ -558,11 +570,14 @@ enum MutateError {
     TypeMismatch,
     InvalidLocation,
 }
-impl From<InvalidLocation> for MutateError {
-    fn from(_: InvalidLocation) -> Self {
-        Self::InvalidLocation
-    }
+from_zsts! { MutateError = InvalidLocation }
+
+enum SwapError {
+    TypeMismatch,
+    InvalidLocation,
+    OverlappingLocations,
 }
+from_zsts! { SwapError = TypeMismatch | InvalidLocation }
 
 /// Error for when an invalid pointer is dereferenced.
 // This is UB!
