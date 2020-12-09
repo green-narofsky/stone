@@ -19,10 +19,17 @@ use ::core::marker::PhantomData;
 #[cfg(feature = "nightly")]
 mod nightly {
     use ::core::marker::PhantomData;
+    #[repr(transparent)]
     struct ParseArray<T, ID, const N: usize> {
         id: PhantomData<ID>,
         buf: [T; N],
     }
+    impl<T, ID, const N: usize> ParseArray<T, ID, N> {
+        fn unsize(&self) -> &ParseSlice<T, ID> {
+            unsafe { ::core::mem::transmute(&self.buf as &[T]) }
+        }
+    }
+    #[repr(transparent)]
     struct ParseSlice<T, ID> {
         id: PhantomData<ID>,
         buf: [T],
@@ -34,7 +41,7 @@ mod nightly {
             id: PhantomData::<()>,
             buf: [1, 2, 3],
         };
-        let a = &arr;
+        let a: &ParseSlice<i32, ()> = arr.unsize();
     }
 }
 
