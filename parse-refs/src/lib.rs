@@ -19,80 +19,123 @@ use ::core::marker::PhantomData;
 #[cfg(feature = "nightly")]
 mod nightly {
     use ::core::marker::PhantomData;
+    use super::ParseSlice;
+    #[derive(Debug)]
     #[repr(transparent)]
     struct ParseArray<T, ID, const N: usize> {
         id: PhantomData<ID>,
         buf: [T; N],
     }
     impl<T, ID, const N: usize> ParseArray<T, ID, N> {
+        /// Constructs a `ParseArray<T, ID, N>` from a `[T; N]`.
+        /// # Safety
+        /// The `ID` type argument must be unique across the whole program.
+        unsafe fn new(buf: [T; N]) -> Self {
+            Self {
+                id: PhantomData,
+                buf,
+            }
+        }
+        /// Creates a DST reference to this array.
         fn unsize(&self) -> &ParseSlice<T, ID> {
             unsafe { ::core::mem::transmute(&self.buf as &[T]) }
         }
-    }
-    #[repr(transparent)]
-    struct ParseSlice<T, ID> {
-        id: PhantomData<ID>,
-        buf: [T],
+        /// Creates a mutable DST reference to this array.
+        fn unsize_mut(&mut self) -> &mut ParseSlice<T, ID> {
+            unsafe { ::core::mem::transmute(&mut self.buf as &mut [T]) }
+        }
+        fn into_inner(self) -> [T; N] {
+            self.buf
+        }
+        fn inner_ref(&self) -> &[T; N] {
+            &self.buf
+        }
+        fn inner_ref_mut(&mut self) -> &mut [T; N] {
+            &mut self.buf
+        }
     }
     #[cfg(test)]
     #[test]
     fn unsizing() {
-        let arr = ParseArray {
+        let mut arr = ParseArray {
             id: PhantomData::<()>,
             buf: [1, 2, 3],
         };
         let a: &ParseSlice<i32, ()> = arr.unsize();
+        println!("{:?}", a);
+        let b: &mut ParseSlice<i32, ()> = arr.unsize_mut();
+        println!("{:?}", b);
     }
 }
 
-#[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
-struct ParseBuf<'a, T, ID> {
-    buf: &'a [T],
+#[derive(Debug)]
+#[repr(transparent)]
+struct ParseSlice<T, ID> {
     /// A marker type that allows us to declare functions
     /// that only operate on references from a single allocated object.
     /// Or, even, functions that require specific arguments to
     /// be from the same allocated object, with others that are allowed
     /// to be from different allocated objects.
     id: PhantomData<ID>,
+    buf: [T],
 }
-impl<'a, T, ID> ParseBuf<'a, T, ID> {
-    unsafe fn new(buf: &'a [T]) -> Self {
-        Self {
-            id: PhantomData,
-            buf,
-        }
+impl<T, ID> ParseSlice<T, ID> {
+    /// Constructs a `&ParseSlice<T, ID>` from a `&[T]`.
+    /// # Safety
+    /// Must be from the same allocation as any other slice
+    /// reference given the same `ID` type argument.
+    unsafe fn from_slice(buf: &[T]) -> &ParseSlice<T, ID> {
+        unsafe { ::core::mem::transmute(buf) }
     }
+    /// Constructs a `&mut ParseSlice<T, ID>` from a `&mut [T]`.
+    /// # Safety
+    /// Must be from the same allocation as any other slice reference
+    /// given the same `ID` type argument.
+    unsafe fn from_slice_mut(buf: &mut [T]) -> &mut ParseSlice<T, ID> {
+        unsafe { ::core::mem::transmute(buf) }
+    }
+    fn slice_ref(&self) -> &[T] {
+        &self.buf
+    }
+    fn slice_ref_mut(&mut self) -> &mut [T] {
+        &mut self.buf
+    }
+    fn offset_from(&self, other: &Self) -> isize {
+        // SAFETY: The safety requirement for constructing the argument
+        // `ParseSlice`s is identical to the safety requirement
+        // for invoking this method. They are from the same allocated object.
+        unsafe { self.buf.as_ptr().offset_from(other.buf.as_ptr()) }
+    }
+    // TODO: implement indexing methods
 }
 
-macro_rules! into_parse_buf {
+#[macro_export]
+macro_rules! parse_ref {
     ($e:expr, $id:ident) => {
         {
             #[derive(Copy, Clone)]
-            struct $id {
-                _priv: [(); 0],
-            }
-
-            
+            struct $id;
+            // SAFETY: Since the `$id` type is unusable outside
+            // of this block, it is therefore unique across the whole program.
+            // Since it is globally unique, we meet the safety
+            // requirement of ParseRef::new, of our coming from the same
+            // allocated object as any other ParseRef with the same type tag.
+            unsafe { ParseSlice::<_, $id>::from_slice($e) }
         }
     }
 }
-// Implement Index and IndexMut to provide these custom slice references.
-// If `pointer::offset_from` works backwards, we only need one type.
-// Otherwise, we need to distinguish between the origin pointer and
-// the rest.
-// This may be affected by slice references' provenance automatically shrinking.
-// In that case, we may be able to avoid that by holding onto raw pointers directly.
-// It is unclear to me what effects that would have on LLVM's ability to optimize,
-// however.
-struct ParseRef<'a, T, ID> {
-    buf: &'a [T],
-    id: ID,
+#[macro_export]
+macro_rules! parse_ref_mut {
+    ($e:expr, $id:ident) => {
+        struct $id;
+        // SAFETY: Same as with `parse_ref!`.
+        unsafe { ParseSlice::<_, $id>::from_slice_mut($e) }
+    }
 }
-
-
 
 #[cfg(test)]
 mod tests {
+    use super::{ParseSlice, parse_ref};
     #[test]
     fn get_offset() {
         let a = "Hello, world.";
