@@ -110,7 +110,12 @@ impl<T, ID> ParseSlice<T, ID> {
         // for invoking this method. They are from the same allocated object.
         unsafe { self.buf.as_ptr().offset_from(other.buf.as_ptr()) }
     }
-    // TODO: implement indexing methods
+    pub fn get<Idx: ParseSliceIndex<T, ID>>(&self, idx: Idx) -> Option<&Idx::Output> {
+        idx.get(self)
+    }
+    pub fn get_mut<Idx: ParseSliceIndex<T, ID>>(&mut self, idx: Idx) -> Option<&mut Idx::Output> {
+        idx.get_mut(self)
+    }
 }
 
 
