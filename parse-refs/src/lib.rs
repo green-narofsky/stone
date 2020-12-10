@@ -112,13 +112,26 @@ impl<T, ID> ParseSlice<T, ID> {
     // TODO: implement indexing methods
 }
 
-impl<T, ID> ::core::ops::Index<::core::ops::Range<usize>> for ParseSlice<T, ID> {
+impl<T, ID, R> ::core::ops::Index<R> for ParseSlice<T, ID>
+where R: ::core::ops::RangeBounds<usize> + ::core::slice::SliceIndex<[T]>,
+{
     type Output = ParseSlice<T, ID>;
-    fn index(&self, index: ::core::ops::Range<usize>) -> &Self::Output {
+    fn index(&self, index: R) -> &Self::Output {
+        use ::core::ops::Bound::{self, *};
+        let slice = match (index.start_bound(), index.end_bound()) {
+            (Included(start), Included(end)) => self.buf.index(*start ..= *end),
+            (Included(start), Excluded(end)) => self.buf.index(*start .. *end),
+            (Included(start), Unbounded) => self.buf.index(*start ..),
+            // True as of Rust 1.48.
+            (Excluded(start), _) => unreachable!("no SliceIndex<[T]> type has an exclusive bottom"),
+            (Unbounded, Included(end)) => self.buf.index(..= *end),
+            (Unbounded, Excluded(end)) => self.buf.index(.. *end),
+            (Unbounded, Unbounded) => self.buf.index(..),
+        };
         // SAFETY: Since we're creating this slice from our current allocated
         // object, it's definitely from the same allocated object as us,
         // so therefore it is allowed to have the same `ID` type argument.
-        unsafe { ParseSlice::from_slice(self.buf.index(index)) }
+        unsafe { ParseSlice::from_slice(slice) }
     }
 }
 
