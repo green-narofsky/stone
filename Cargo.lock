@@ -212,6 +212,9 @@ dependencies = [
 [[package]]
 name = "parse-refs"
 version = "0.1.0"
+dependencies = [
+ "trait-match",
+]
 
 [[package]]
 name = "proc-macro-error"
@@ -360,6 +363,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
 dependencies = [
  "unicode-width",
+]
+
+[[package]]
+name = "trait-match"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "224c165eae5fed807830550e016feff550e3eeab535843c38422981d8e669fa8"
+dependencies = [
+ "trait-match-proc-macro",
+]
+
+[[package]]
+name = "trait-match-proc-macro"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8922137e1453dcd8cc053376005ddf32942086e7ba4b7c96464dbff6309b669e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

@@ -15,6 +15,7 @@
 //! a misbehaving combinator might do something like `Box::leak`
 //! to give back a reference with the appropriate lifetime.
 use ::core::marker::PhantomData;
+use ::trait_match::sealed;
 
 #[cfg(feature = "nightly")]
 mod nightly {
@@ -70,7 +71,7 @@ mod nightly {
 
 #[derive(Debug)]
 #[repr(transparent)]
-struct ParseSlice<T, ID> {
+pub struct ParseSlice<T, ID> {
     /// A marker type that allows us to declare functions
     /// that only operate on references from a single allocated object.
     /// Or, even, functions that require specific arguments to
@@ -84,7 +85,7 @@ impl<T, ID> ParseSlice<T, ID> {
     /// # Safety
     /// Must be from the same allocation as any other slice
     /// reference given the same `ID` type argument.
-    unsafe fn from_slice(buf: &[T]) -> &ParseSlice<T, ID> {
+    pub unsafe fn from_slice(buf: &[T]) -> &ParseSlice<T, ID> {
         // Mark unsafe stuff more specifically.
         #[allow(unused_unsafe)]
         unsafe { ::core::mem::transmute(buf) }
@@ -93,17 +94,17 @@ impl<T, ID> ParseSlice<T, ID> {
     /// # Safety
     /// Must be from the same allocation as any other slice reference
     /// given the same `ID` type argument.
-    unsafe fn from_slice_mut(buf: &mut [T]) -> &mut ParseSlice<T, ID> {
+    pub unsafe fn from_slice_mut(buf: &mut [T]) -> &mut ParseSlice<T, ID> {
         #[allow(unused_unsafe)]
         unsafe { ::core::mem::transmute(buf) }
     }
-    fn slice_ref(&self) -> &[T] {
+    pub fn slice_ref(&self) -> &[T] {
         &self.buf
     }
-    fn slice_ref_mut(&mut self) -> &mut [T] {
+    pub fn slice_ref_mut(&mut self) -> &mut [T] {
         &mut self.buf
     }
-    fn offset_from(&self, other: &Self) -> isize {
+    pub fn offset_from(&self, other: &Self) -> isize {
         // SAFETY: The safety requirement for constructing the argument
         // `ParseSlice`s is identical to the safety requirement
         // for invoking this method. They are from the same allocated object.
@@ -112,26 +113,73 @@ impl<T, ID> ParseSlice<T, ID> {
     // TODO: implement indexing methods
 }
 
-impl<T, ID, R> ::core::ops::Index<R> for ParseSlice<T, ID>
-where R: ::core::ops::RangeBounds<usize> + ::core::slice::SliceIndex<[T]>,
+
+// Work around limitation in my #[sealed] macro.
+type RangeIndex =          ::core::ops::Range<usize>;
+type RangeFromIndex =      ::core::ops::RangeFrom<usize>;
+use ::core::ops::RangeFull;
+type RangeInclusiveIndex = ::core::ops::RangeInclusive<usize>;
+type RangeToIndex =        ::core::ops::RangeTo<usize>;
+type RangeToInclusiveIndex =    ::core::ops::RangeToInclusive<usize>;
+
+// Essentially stolen from the Rust standard library, haha.
+// Unifies some inherent methods with `Index` and `IndexMut` implementation.
+#[sealed(RangeIndex, RangeFromIndex, RangeFull,
+         RangeInclusiveIndex, RangeToIndex, RangeToInclusiveIndex, usize)]
+pub trait ParseSliceIndex<T, ID> {
+    type Output: ?Sized;
+    fn get(self, slice: &ParseSlice<T, ID>) -> Option<&Self::Output>;
+    fn get_mut(self, slice: &mut ParseSlice<T, ID>) -> Option<&mut Self::Output>;
+}
+
+impl<T, ID, PI> ::core::ops::Index<PI> for ParseSlice<T, ID>
+where PI: ParseSliceIndex<T, ID>,
 {
-    type Output = ParseSlice<T, ID>;
-    fn index(&self, index: R) -> &Self::Output {
-        use ::core::ops::Bound::*;
-        let slice = match (index.start_bound(), index.end_bound()) {
-            (Included(start), Included(end)) => self.buf.index(*start ..= *end),
-            (Included(start), Excluded(end)) => self.buf.index(*start .. *end),
-            (Included(start), Unbounded) => self.buf.index(*start ..),
-            // True as of Rust 1.48.
-            (Excluded(start), _) => unreachable!("no SliceIndex<[T]> type has an exclusive bottom"),
-            (Unbounded, Included(end)) => self.buf.index(..= *end),
-            (Unbounded, Excluded(end)) => self.buf.index(.. *end),
-            (Unbounded, Unbounded) => self.buf.index(..),
-        };
-        // SAFETY: Since we're creating this slice from our current allocated
-        // object, it's definitely from the same allocated object as us,
-        // so therefore it is allowed to have the same `ID` type argument.
-        unsafe { ParseSlice::from_slice(slice) }
+    type Output = PI::Output;
+    fn index(&self, index: PI) -> &Self::Output {
+        index.get(self).unwrap()
+    }
+}
+impl<T, ID, PI> ::core::ops::IndexMut<PI> for ParseSlice<T, ID>
+where PI: ParseSliceIndex<T, ID>,
+{
+    fn index_mut(&mut self, index: PI) -> &mut Self::Output {
+        index.get_mut(self).unwrap()
+    }
+}
+
+macro_rules! impl_range_index {
+    ($t:ty) => {
+        impl<T, ID> ParseSliceIndex<T, ID> for $t {
+            type Output = ParseSlice<T, ID>;
+            fn get(self, slice: &ParseSlice<T, ID>) -> Option<&Self::Output> {
+                // SAFETY: Since we're creating this slice from our current allocated
+                // object, it's definitely from the same allocated object as us,
+                // so therefore it is allowed to have the same `ID` type argument.
+                slice.buf.get(self).map(|buf| unsafe { ParseSlice::from_slice(buf) })
+            }
+            fn get_mut(self, slice: &mut ParseSlice<T, ID>) -> Option<&mut Self::Output> {
+                // SAFETY: Same as in `self.get`.
+                slice.buf.get_mut(self).map(|buf| unsafe { ParseSlice::from_slice_mut(buf) })
+            }
+        }
+    }
+}
+
+impl_range_index!(::core::ops::Range<usize>);
+impl_range_index!(::core::ops::RangeFrom<usize>);
+impl_range_index!(::core::ops::RangeFull);
+impl_range_index!(::core::ops::RangeInclusive<usize>);
+impl_range_index!(::core::ops::RangeTo<usize>);
+impl_range_index!(::core::ops::RangeToInclusive<usize>);
+
+impl<T, ID> ParseSliceIndex<T, ID> for usize {
+    type Output = T;
+    fn get(self, slice: &ParseSlice<T, ID>) -> Option<&Self::Output> {
+        slice.buf.get(self)
+    }
+    fn get_mut(self, slice: &mut ParseSlice<T, ID>) -> Option<&mut Self::Output> {
+        slice.buf.get_mut(self)
     }
 }
 
@@ -146,7 +194,7 @@ macro_rules! parse_ref {
             // Since it is globally unique, we meet the safety
             // requirement of ParseRef::new, of our coming from the same
             // allocated object as any other ParseRef with the same type tag.
-            unsafe { ParseSlice::<_, $id>::from_slice($e) }
+            unsafe { crate::ParseSlice::<_, $id>::from_slice($e) }
         }
     }
 }
@@ -155,7 +203,7 @@ macro_rules! parse_ref_mut {
     ($e:expr, $id:ident) => {
         struct $id;
         // SAFETY: Same as with `parse_ref!`.
-        unsafe { ParseSlice::<_, $id>::from_slice_mut($e) }
+        unsafe { crate::ParseSlice::<_, $id>::from_slice_mut($e) }
     }
 }
 
@@ -193,5 +241,12 @@ mod tests {
         let b = parse_ref!(&a, Lol);
         let c = &b[1..2];
         assert_eq!(c.offset_from(b), 1);
+    }
+    #[cfg(test)]
+    #[test]
+    fn indexing() {
+        let a = vec![1, 2, 3];
+        let b = parse_ref!(&a, Lol);
+        let c = &b[1];
     }
 }
