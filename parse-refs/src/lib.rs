@@ -117,7 +117,7 @@ where R: ::core::ops::RangeBounds<usize> + ::core::slice::SliceIndex<[T]>,
 {
     type Output = ParseSlice<T, ID>;
     fn index(&self, index: R) -> &Self::Output {
-        use ::core::ops::Bound::{self, *};
+        use ::core::ops::Bound::*;
         let slice = match (index.start_bound(), index.end_bound()) {
             (Included(start), Included(end)) => self.buf.index(*start ..= *end),
             (Included(start), Excluded(end)) => self.buf.index(*start .. *end),
