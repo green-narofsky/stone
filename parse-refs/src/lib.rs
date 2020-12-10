@@ -109,6 +109,16 @@ impl<T, ID> ParseSlice<T, ID> {
     // TODO: implement indexing methods
 }
 
+impl<T, ID> ::core::ops::Index<::core::ops::Range<usize>> for ParseSlice<T, ID> {
+    type Output = ParseSlice<T, ID>;
+    fn index(&self, index: ::core::ops::Range<usize>) -> &Self::Output {
+        // SAFETY: Since we're creating this slice from our current allocated
+        // object, it's definitely from the same allocated object as us,
+        // so therefore it is allowed to have the same `ID` type argument.
+        unsafe { ParseSlice::from_slice(self.buf.index(index)) }
+    }
+}
+
 #[macro_export]
 macro_rules! parse_ref {
     ($e:expr, $id:ident) => {
@@ -159,5 +169,13 @@ mod tests {
         // The two pointers are from separate allocated objects.
         let offset = unsafe { c.offset_from(d) };
         println!("Offset: {}", offset);
+    }
+    #[cfg(test)]
+    #[test]
+    fn safe_get_offset() {
+        let a = vec![1, 2, 3];
+        let b = parse_ref!(&a, Lol);
+        let c = &b[1..2];
+        assert_eq!(c.offset_from(b), 1);
     }
 }
