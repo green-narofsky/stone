@@ -188,6 +188,14 @@ impl<T, ID> ParseSliceIndex<T, ID> for usize {
     }
 }
 
+/// Safely create a `&ParseSlice`.
+/// ```ignore
+/// let a = vec![1, 2, 3];
+/// let b = parse_ref!(&a, Lol);
+/// let c = &b[1..2];
+/// assert_eq!(c.offset_from(b), 1);
+/// ```
+/// Takes a slice reference and identifier as arguments.
 #[macro_export]
 macro_rules! parse_ref {
     ($e:expr, $id:ident) => {
@@ -203,6 +211,7 @@ macro_rules! parse_ref {
         }
     }
 }
+/// Safely create a `&mut ParseSlice`, as with [`parse_ref`].
 #[macro_export]
 macro_rules! parse_ref_mut {
     ($e:expr, $id:ident) => {
