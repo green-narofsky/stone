@@ -215,9 +215,11 @@ macro_rules! parse_ref {
 #[macro_export]
 macro_rules! parse_ref_mut {
     ($e:expr, $id:ident) => {
-        struct $id;
-        // SAFETY: Same as with `parse_ref!`.
-        unsafe { crate::ParseSlice::<_, $id>::from_slice_mut($e) }
+        {
+            struct $id;
+            // SAFETY: Same as with `parse_ref!`.
+            unsafe { crate::ParseSlice::<_, $id>::from_slice_mut($e) }
+        }
     }
 }
 
