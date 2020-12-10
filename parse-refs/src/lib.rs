@@ -153,7 +153,7 @@ mod tests {
         let c = &b[3..];
         // SAFETY: These two pointers are from the same allocated object.
         let offset = unsafe { c.as_ptr().offset_from(b.as_ptr()) };
-        println!("Offset: {}", offset);
+        assert_eq!(offset, 3);
     }
     // This test intentionally triggers UB, just to make sure Miri will catch
     // the issue that this crate exists to prevent.
