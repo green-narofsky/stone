@@ -85,6 +85,8 @@ impl<T, ID> ParseSlice<T, ID> {
     /// Must be from the same allocation as any other slice
     /// reference given the same `ID` type argument.
     unsafe fn from_slice(buf: &[T]) -> &ParseSlice<T, ID> {
+        // Mark unsafe stuff more specifically.
+        #[allow(unused_unsafe)]
         unsafe { ::core::mem::transmute(buf) }
     }
     /// Constructs a `&mut ParseSlice<T, ID>` from a `&mut [T]`.
@@ -92,6 +94,7 @@ impl<T, ID> ParseSlice<T, ID> {
     /// Must be from the same allocation as any other slice reference
     /// given the same `ID` type argument.
     unsafe fn from_slice_mut(buf: &mut [T]) -> &mut ParseSlice<T, ID> {
+        #[allow(unused_unsafe)]
         unsafe { ::core::mem::transmute(buf) }
     }
     fn slice_ref(&self) -> &[T] {
