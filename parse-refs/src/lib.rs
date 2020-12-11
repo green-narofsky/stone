@@ -69,6 +69,7 @@ mod nightly {
     }
 }
 
+/// A type tagged slice that makes taking the offset between references to it a safe operation.
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct ParseSlice<T, ID> {
@@ -196,6 +197,8 @@ impl<T, ID> ParseSliceIndex<T, ID> for usize {
 /// assert_eq!(c.offset_from(b), 1);
 /// ```
 /// Takes a slice reference and identifier as arguments.
+/// The identifier does not need to be unique,
+/// but making it so will make type mismatch compile errors nicer to read.
 #[macro_export]
 macro_rules! parse_ref {
     ($e:expr, $id:ident) => {
