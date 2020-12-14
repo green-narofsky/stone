@@ -14,7 +14,8 @@ pub struct Tagged<DST: ?Sized, ID> {
 /// This trait determines what offsets are calculated in units of,
 /// when using the `Tagged::offset_from` method.
 /// Implementors of this trait must guarantee that all `&Tagged` references
-/// to them are separated by exact multiples of the size of `TaggedUnit::Item`.
+/// to them with the same `ID` type argument are separated by exact
+/// multiples of the size of `TaggedUnit::Item`.
 pub unsafe trait TaggedUnit {
     type Item;
 }
