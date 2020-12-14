@@ -5,6 +5,8 @@ use ::core::ops::{Index, IndexMut};
 
 /// A type tagged wrapper around `?Sized` types, built around
 /// letting you compute offsets between references from single allocated objects.
+// This is intentionally not Copy or Clone.
+// Copying a `Tagged<DST, ID>` to a new location immediately breaks its single invariant.
 #[repr(transparent)]
 pub struct Tagged<DST: ?Sized, ID> {
     id: PhantomData<ID>,
