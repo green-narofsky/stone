@@ -193,7 +193,8 @@ impl<T, ID> ParseSliceIndex<T, ID> for usize {
 }
 
 /// Safely create a `&ParseSlice`.
-/// ```ignore
+/// ```
+/// # use ::parse_refs::parse_ref;
 /// let a = vec![1, 2, 3];
 /// let b = parse_ref!(&a, Lol);
 /// let c = &b[1..2];
