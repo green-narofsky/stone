@@ -1,5 +1,8 @@
 use ::core::marker::PhantomData;
 use ::core::ops::Range;
+
+/// A type tagged DST, built around letting you compute offsets between
+/// references to sections of it.
 #[repr(transparent)]
 pub struct Tagged<DST: ?Sized, ID> {
     id: PhantomData<ID>,
