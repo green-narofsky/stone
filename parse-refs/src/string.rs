@@ -7,6 +7,12 @@ use ::core::ops::{Index, IndexMut};
 /// letting you compute offsets between references from single allocated objects.
 // This is intentionally not Copy or Clone.
 // Copying a `Tagged<DST, ID>` to a new location immediately breaks its single invariant.
+// Note that *moving* a `Tagged<DST, ID>` doesn't break its invariant, because
+// moving requires unique access. Unique access, given the invariant is otherwise upheld,
+// implies that there exist no references with the same `ID` argument.
+// That in turn means that although moving changes the location of the `Tagged<DST, ID>`,
+// it retains the property of being the same allocated object as all other `Tagged<DST, ID>`s
+// with the same `ID` argument, since there are no others.
 #[repr(transparent)]
 pub struct Tagged<DST: ?Sized, ID> {
     id: PhantomData<ID>,
