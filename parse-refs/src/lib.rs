@@ -16,6 +16,7 @@
 //! to give back a reference with the appropriate lifetime.
 use ::core::marker::PhantomData;
 use ::trait_match::sealed;
+pub mod string;
 
 #[cfg(feature = "nightly")]
 mod nightly {
