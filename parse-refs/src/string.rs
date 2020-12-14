@@ -11,7 +11,28 @@ pub struct Tagged<DST: ?Sized, ID> {
     buf: DST,
 }
 
-impl<DST: ?Sized, ID> Tagged<DST, ID> {
+/// This trait determines what offsets are calculated in units of,
+/// when using the `Tagged::offset_from` method.
+/// Implementors of this trait must guarantee that all `&Tagged` references
+/// to them are separated by exact multiples of the size of `TaggedUnit::Item`.
+pub unsafe trait TaggedUnit {
+    type Item;
+}
+unsafe impl<T> TaggedUnit for [T] {
+    type Item = T;
+}
+unsafe impl TaggedUnit for str {
+    type Item = u8;
+}
+/// All `Sized` types are their own unit.
+// Note that the `Sized` bound here is implicit.
+unsafe impl<T> TaggedUnit for T {
+    type Item = T;
+}
+
+impl<DST: ?Sized, ID> Tagged<DST, ID>
+where DST: TaggedUnit,
+{
     // This safety condition may need to be strengthened for this library to be sound.
     // To "the ID type argument must be unique",
     // or the slightly weaker "must have the same provenance as any other
@@ -31,6 +52,25 @@ impl<DST: ?Sized, ID> Tagged<DST, ID> {
     pub unsafe fn from_untagged_mut(buf: &mut DST) -> &mut Self {
         #[allow(unused_unsafe)]
         unsafe { ::core::mem::transmute(buf) }
+    }
+    pub fn offset_from(&self, other: &Tagged<DST, ID>) -> isize {
+        // This method is what this whole library exists to enable.
+        // If this is unsound, rewrite the rest of the library.
+        // SAFETY: Meeting the safey requirement for constructing
+        // `&Tagged<DST, ID>`s implies meeting the safety requirement
+        // for invoking `offset_from` between two raw pointers derived
+        // from those references.
+        unsafe {
+            (&self.buf as *const DST as *const <DST as TaggedUnit>::Item)
+                .offset_from(&other.buf as *const DST as *const <DST as TaggedUnit>::Item)
+        }
+    }
+
+    pub fn get<Idx: TaggedDSTIndex<DST, ID>>(&self, idx: Idx) -> Option<&Idx::Output> {
+        idx.get(self)
+    }
+    pub fn get_mut<Idx: TaggedDSTIndex<DST, ID>>(&mut self, idx: Idx) -> Option<&mut Idx::Output> {
+        idx.get_mut(self)
     }
 }
 
@@ -97,7 +137,7 @@ impl<T, ID> TaggedDSTIndex<[T], ID> for usize {
     }
 }
 
-impl<T, ID, Idx> Index<Idx> for Tagged<T, ID>
+impl<T: ?Sized, ID, Idx> Index<Idx> for Tagged<T, ID>
 where Idx: TaggedDSTIndex<T, ID>
 {
     type Output = Idx::Output;
@@ -105,7 +145,7 @@ where Idx: TaggedDSTIndex<T, ID>
         index.get(self).unwrap()
     }
 }
-impl<T, ID, Idx> IndexMut<Idx> for Tagged<T, ID>
+impl<T: ?Sized, ID, Idx> IndexMut<Idx> for Tagged<T, ID>
 where Idx: TaggedDSTIndex<T, ID>
 {
     fn index_mut(&mut self, index: Idx) -> &mut Self::Output {
