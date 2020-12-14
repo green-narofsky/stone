@@ -87,7 +87,9 @@ impl<T, ID> ParseSlice<T, ID> {
     /// Must be from the same allocation as any other slice
     /// reference given the same `ID` type argument.
     pub unsafe fn from_slice(buf: &[T]) -> &ParseSlice<T, ID> {
-        // Mark unsafe stuff more specifically.
+        // SAFETY: ParseSlice<T, ID> is `#[repr(transparent)]` with
+        // its only non ZST field being `[T]`. So, transmuting a
+        // `&[T]` to a `&ParseSlice<T, _>` should be fine.
         #[allow(unused_unsafe)]
         unsafe { ::core::mem::transmute(buf) }
     }
