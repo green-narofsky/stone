@@ -154,6 +154,36 @@ where Idx: TaggedDSTIndex<T, ID>
     }
 }
 
+/// Safely construct a tagged reference.
+#[macro_export]
+macro_rules! tag_ref {
+    ($e:expr , $id:ident) => {
+        {
+            struct $id;
+            // SAFETY: Since the `$id` type is unusable outside of this block,
+            // it is therefore unique across the whole program.
+            // Global uniqueness implies meeting the requirement of only
+            // sharing a type tag with references to the same allocated object.
+            unsafe { crate::string::Tagged::<_, $id>::from_untagged($e) }
+        }
+    }
+}
+
+/// Safely construct a tagged mutable reference.
+#[macro_export]
+macro_rules! tag_ref_mut {
+    ($e:expr , $id:ident) => {
+        {
+            struct $id;
+            // SAFETY: Since the `$id` type is unusable outside of this block,
+            // it is therefore unique across the whole program.
+            // Global uniqueness implies meeting the requirement of only
+            // sharing a type tag with references to the same allocated object.
+            unsafe { crate::string::Tagged::<_, $id>::from_untagged_mut($e) }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
