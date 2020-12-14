@@ -213,7 +213,7 @@ macro_rules! parse_ref {
             // Since it is globally unique, we meet the safety
             // requirement of ParseRef::new, of our coming from the same
             // allocated object as any other ParseRef with the same type tag.
-            unsafe { crate::ParseSlice::<_, $id>::from_slice($e) }
+            unsafe { $crate::ParseSlice::<_, $id>::from_slice($e) }
         }
     }
 }
@@ -224,7 +224,7 @@ macro_rules! parse_ref_mut {
         {
             struct $id;
             // SAFETY: Same as with `parse_ref!`.
-            unsafe { crate::ParseSlice::<_, $id>::from_slice_mut($e) }
+            unsafe { $crate::ParseSlice::<_, $id>::from_slice_mut($e) }
         }
     }
 }

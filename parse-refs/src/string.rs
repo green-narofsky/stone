@@ -164,7 +164,7 @@ macro_rules! tag_ref {
             // it is therefore unique across the whole program.
             // Global uniqueness implies meeting the requirement of only
             // sharing a type tag with references to the same allocated object.
-            unsafe { crate::string::Tagged::<_, $id>::from_untagged($e) }
+            unsafe { $crate::string::Tagged::<_, $id>::from_untagged($e) }
         }
     }
 }
@@ -179,7 +179,7 @@ macro_rules! tag_ref_mut {
             // it is therefore unique across the whole program.
             // Global uniqueness implies meeting the requirement of only
             // sharing a type tag with references to the same allocated object.
-            unsafe { crate::string::Tagged::<_, $id>::from_untagged_mut($e) }
+            unsafe { $crate::string::Tagged::<_, $id>::from_untagged_mut($e) }
         }
     }
 }
