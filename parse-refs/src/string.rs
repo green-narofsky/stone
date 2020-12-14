@@ -25,9 +25,6 @@ impl<DST: ?Sized, ID> Tagged<DST, ID> {
     }
 }
 
-/// Implementors of this trait are required to return references to a single allocated object.
-/// That is, references returned from these methods that have overlapping lifetimes
-/// *must* be to the same allocated object, as required by `::core::ptr::offset_from`.
 pub trait TaggedDSTIndex<DST: ?Sized, ID> {
     type Output: ?Sized;
     fn get(self, buf: &Tagged<DST, ID>) -> Option<&Self::Output>;
