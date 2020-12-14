@@ -1,6 +1,7 @@
 //! Generalizing this library's API to be usable on string slices as well.
 use ::core::marker::PhantomData;
 use ::core::ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive};
+use ::core::ops::{Index, IndexMut};
 
 /// A type tagged wrapper around `?Sized` types, built around
 /// letting you compute offsets between references from single allocated objects.
@@ -93,6 +94,22 @@ impl<T, ID> TaggedDSTIndex<[T], ID> for usize {
         // our current slice, it's definitely from the same allocated object as us.
         // So, it's allowed to have the same `ID` type argument.
         <[T]>::get_mut(&mut buf.buf, self).map(|item| unsafe { Tagged::from_untagged_mut(item) })
+    }
+}
+
+impl<T, ID, Idx> Index<Idx> for Tagged<T, ID>
+where Idx: TaggedDSTIndex<T, ID>
+{
+    type Output = Idx::Output;
+    fn index(&self, index: Idx) -> &Self::Output {
+        index.get(self).unwrap()
+    }
+}
+impl<T, ID, Idx> IndexMut<Idx> for Tagged<T, ID>
+where Idx: TaggedDSTIndex<T, ID>
+{
+    fn index_mut(&mut self, index: Idx) -> &mut Self::Output {
+        index.get_mut(self).unwrap()
     }
 }
 
