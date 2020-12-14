@@ -190,7 +190,7 @@ mod tests {
     #[test]
     fn slice_offsets() {
         let a = b"Hello, world!";
-        let b: &Tagged<[u8], ()> = unsafe { Tagged::from_untagged(a) };
+        let b: &Tagged<[u8], _> = tag_ref!(a, Demo);
         let c = &b[1..];
         let d = &b[4..];
         assert_eq!(d.offset_from(c), 3);
@@ -198,7 +198,7 @@ mod tests {
     #[test]
     fn item_offsets() {
         let a = b"Hello, world!";
-        let b: &Tagged<[u8], ()> = unsafe { Tagged::from_untagged(a) };
+        let b: &Tagged<[u8], _> = tag_ref!(a, Demo);
         let c = &b[1];
         let d = &b[4];
         assert_eq!(d.offset_from(c), 3);
