@@ -194,6 +194,10 @@ impl<T: ?Sized, ID> DerefMut for Tagged<T, ID> {
 /// Safely construct a tagged reference.
 #[macro_export]
 macro_rules! tag_ref {
+    // Since the tag type can't be named outside its block expression,
+    // it doesn't matter what it's name is.
+    // Given that, we can provide a somewhat descriptive default.
+    ($e:expr) => { $crate::tag_ref!($e, UnnamedTag) };
     ($e:expr , $id:ident) => {
         {
             struct $id;
@@ -209,6 +213,10 @@ macro_rules! tag_ref {
 /// Safely construct a tagged mutable reference.
 #[macro_export]
 macro_rules! tag_ref_mut {
+    // Since the tag type can't be named outside its block expression,
+    // it doesn't matter what it's name is.
+    // Given that, we can provide a somewhat descriptive default.
+    ($e:expr) => { $crate::tag_ref_mut!($e, UnnamedTag) };
     ($e:expr , $id:ident) => {
         {
             struct $id;
@@ -227,7 +235,7 @@ mod tests {
     #[test]
     fn slice_offsets() {
         let a = b"Hello, world!";
-        let b: &Tagged<[u8], _> = tag_ref!(a, Demo);
+        let b: &Tagged<[u8], _> = tag_ref!(a);
         let c = &b[1..];
         let d = &b[4..];
         assert_eq!(d.offset_from(c), 3);
@@ -235,7 +243,7 @@ mod tests {
     #[test]
     fn item_offsets() {
         let a = b"Hello, world!";
-        let b: &Tagged<[u8], _> = tag_ref!(a, Demo);
+        let b: &Tagged<[u8], _> = tag_ref!(a);
         let c = &b[1];
         let d = &b[4];
         assert_eq!(d.offset_from(c), 3);
