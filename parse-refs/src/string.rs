@@ -13,6 +13,16 @@ use ::core::ops::{Index, IndexMut};
 // That in turn means that although moving changes the location of the `Tagged<DST, ID>`,
 // it retains the property of being the same allocated object as all other `Tagged<DST, ID>`s
 // with the same `ID` argument, since there are no others.
+// This is actually not entirely the case. If you can move a *segment* of a `Tagged<DST, ID>`
+// out while retaining the same `ID` type argument, you break the invariant.
+// For example, split_at_mut on slices could give you this, if you also had a way to...
+// create a `Tagged<DST, ID>` with that same ID argument ahead of time to replace it with.
+// Fortunately, there is no way to do this with safe code.
+// We must simply remember to be careful of that: The *only* way to construct these safely
+// *must* be to either:
+//  A) Get it from one of the `tag_*` macros.
+//  B) Make it out of one you already have.
+// TODO: Figure out if Cell types are relevant.
 #[repr(transparent)]
 pub struct Tagged<DST: ?Sized, ID> {
     id: PhantomData<ID>,
