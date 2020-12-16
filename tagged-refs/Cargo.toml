@@ -1,5 +1,5 @@
 [package]
-name = "parse-refs"
+name = "tagged-refs"
 version = "0.1.0"
 authors = ["John Matthew Narofsky <7ytd765789@gmail.com>"]
 edition = "2018"

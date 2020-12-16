@@ -18,6 +18,7 @@ nom = "5.1.2"
 serde_json = "1.0.58"
 lasso = { version = "0.3.1", features = ["serialize"] }
 dynasmrt = "1.0.0"
+tagged-refs = { path = "./tagged-refs" }
 
 [workspace]
-members = ["parse-refs"]
+members = ["tagged-refs"]
