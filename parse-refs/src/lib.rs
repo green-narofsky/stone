@@ -4,16 +4,7 @@
 //! that all slice references created and returned during parsing
 //! point into the same underlying slice.
 //!
-//! This is needed for us to safely calculate offsets of those references
-//! into the slice for the purpose of reporting information,
-//! without either passing around offsets in place of or in addition to
-//! the references we're throwing around.
-//!
-//! (I intend to do a few benchmarks to verify that this matters.)
-//!
-//! This is *almost* given to us for free, but
-//! a misbehaving combinator might do something like `Box::leak`
-//! to give back a reference with the appropriate lifetime.
+//! This is needed for us to safely calculate offsets between those references.
 pub mod string;
 
 #[cfg(test)]
