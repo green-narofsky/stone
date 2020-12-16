@@ -2,6 +2,7 @@
 use ::core::marker::PhantomData;
 use ::core::ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive};
 use ::core::ops::{Index, IndexMut};
+use ::core::ops::{Deref, DerefMut};
 
 /// A type tagged wrapper around `?Sized` types, built around
 /// letting you compute offsets between references from single allocated objects.
@@ -169,6 +170,22 @@ where Idx: TaggedDSTIndex<T, ID>
 {
     fn index_mut(&mut self, index: Idx) -> &mut Self::Output {
         index.get_mut(self).unwrap()
+    }
+}
+
+// Since the given reference no longer has its tag,
+// there is no way it can be used to break our invariant.
+impl<T: ?Sized, ID> Deref for Tagged<T, ID> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.buf
+    }
+}
+// Since the given reference no longer has its tag,
+// there is no way it can be used to break our invariant.
+impl<T: ?Sized, ID> DerefMut for Tagged<T, ID> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buf
     }
 }
 
