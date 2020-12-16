@@ -235,7 +235,7 @@ macro_rules! tag_ref_mut {
 
 #[cfg(test)]
 mod tests {
-    use super::{Tagged, tag_ref as parse_ref};
+    use super::Tagged;
     #[test]
     fn get_offset() {
         let a = "Hello, world.";
@@ -264,7 +264,7 @@ mod tests {
     #[test]
     fn safe_get_offset() {
         let a = vec![1, 2, 3];
-        let b = parse_ref!(&*a, Lol);
+        let b = tag_ref!(&*a, Lol);
         let c = &b[1..2];
         assert_eq!(c.offset_from(b), 1);
     }
@@ -272,8 +272,8 @@ mod tests {
     #[test]
     fn indexing() {
         let a = vec![1, 2, 3];
-        let b = parse_ref!(&*a, Lol);
-        let c = &b[1];
+        let b = tag_ref!(&*a, Lol);
+        let _ = &b[1];
     }
     #[test]
     fn slice_offsets() {
