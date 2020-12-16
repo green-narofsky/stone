@@ -1,5 +1,3 @@
-#![cfg_attr(feature = "nightly", feature(min_const_generics))]
-
 //! Attempting to establish a type level guarantee
 //! that all slice references created and returned during parsing
 //! point into the same underlying slice.
