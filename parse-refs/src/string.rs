@@ -173,6 +173,8 @@ where Idx: TaggedDSTIndex<T, ID>
     }
 }
 
+// SEMVER: Since Rust may add new methods to the slice types at any time,
+// adding inherent methods to the `Tagged<DST, ID>` type will be a SemVer break.
 // Since the given reference no longer has its tag,
 // there is no way it can be used to break our invariant.
 impl<T: ?Sized, ID> Deref for Tagged<T, ID> {
